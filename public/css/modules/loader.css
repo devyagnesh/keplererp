@@ -1,0 +1,4 @@
+/* Single-purpose overlay stacking for the global AJAX loader (theme has no z-index token high enough). */
+#global-loader {
+    z-index: 9999;
+}

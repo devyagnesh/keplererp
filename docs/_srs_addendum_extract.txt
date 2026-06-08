@@ -1,0 +1,916 @@
+--- Page 1 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 1
+ManufactureERP
+Software Requirements Specification — Extended Edition
+Chapter 21 — PDF Generation Specifications
+Chapter 22 — Live End-to-End Use Cases
+Version 1.1  |  May 2026  |  Confidential Addendum
+Extends SRS v1.0 — On-Premise Laravel ERP for Indian Manufacturing SMEs
+ Document Type
+SRS Addendum — Chapters 21 & 22
+ Extends
+ManufactureERP SRS v1.0 (April 2026)
+ Framework
+Laravel 11 · PHP 8.2 · MySQL 8 · DomPDF
+ Audience
+Engineering, QA, Client Stakeholders
+ Status
+Draft v1.1
+
+--- Page 2 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 2
+Table of Contents — This Addendum
+21
+PDF Generation Specifications
+21.
+1
+PDF Engine Architecture (DomPDF + Laravel)
+21.
+2
+GST Tax Invoice PDF
+21.
+3
+Purchase Order PDF
+21.
+4
+Goods Receipt Note (GRN) PDF
+21.
+5
+Quotation PDF
+21.
+6
+Delivery Challan PDF
+21.
+7
+Payslip / Salary Slip PDF
+21.
+8
+Payroll Summary Report PDF
+21.
+9
+Stock Ledger Report PDF
+21.
+10
+GSTR-1 / GSTR-3B Export PDF
+21.
+11
+Vendor Statement PDF
+21.
+12
+Production Order PDF
+21.
+13
+PDF Security & Delivery
+22
+Live End-to-End Use Cases
+22.
+1
+Use Case: Full Procurement Cycle (Pharma RM)
+22.
+2
+Use Case: Sales Order to Cash (Auto Parts)
+22.
+3
+Use Case: Production Run (Chemical Batch)
+22.
+4
+Use Case: Monthly Payroll Processing
+22.
+5
+Use Case: GST Return Filing Month-End
+
+--- Page 3 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 3
+22.
+6
+Use Case: New Employee Onboarding
+22.
+7
+Use Case: Warehouse Transfer & Stock Reconciliation
+22.
+8
+Use Case: Vendor Portal Order Acceptance
+
+--- Page 4 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 4
+CHAPTER 21
+PDF Generation Specifications
+ManufactureERP uses DomPDF (via the laravel-dompdf package) as its primary PDF rendering engine.
+Every document type has a dedicated Blade template, a Laravel PDF job class, and a structured delivery
+pipeline. This chapter specifies the exact content, layout, data sources, and generation logic for every PDF
+in the system.
+21.1 PDF Engine Architecture
+Technology: barryvdh/laravel-dompdf v2.x  |  Queue: All PDF jobs pushed to pdf-generation queue via Laravel Horizon  | 
+Storage: Generated PDFs stored in storage/app/documents/{module}/{year-month}/  |  Delivery: Download link via signed
+URL (expires 24h) or direct WhatsApp attachment
+1
+Controller / Event Triggers PDF
+Route or event calls PdfGeneratorService::generate($model). A dedicated job class is dispatched to the queue.
+2
+Blade Template Rendered
+The queued job loads the appropriate Blade view (resources/views/pdfs/{module}/{template}.blade.php) and
+passes the Eloquent model with eager-loaded relations.
+3
+DomPDF Renders HTML → PDF
+Dompdf::loadView() converts the HTML+CSS to PDF. Paper size A4, orientation portrait (landscape for reports).
+Font: DejaVu Sans (Unicode support for ■ symbol).
+4
+PDF Stored & URL Generated
+PDF saved with hashed filename. Signed URL generated via URL::temporarySignedRoute() expiring in 24 hours.
+URL stored on the model record.
+5
+Delivery
+User downloads via browser. OR job fires WhatsApp notification attaching the PDF URL. OR email via Laravel
+Mail with PDF as attachment.
+Global PDF Header/Footer Blade Component:
+All PDFs share a master layout (layouts/pdf-master.blade.php) that injects: company logo (top-left), company
+name + GSTIN + address (top-right), document title centred below header, and footer with page number + 'This
+is a computer-generated document.' + generation timestamp.
+21.2 GST Tax Invoice PDF
+The most critical document. Generated on invoice POST. Required for e-Invoice (IRN), customer dispatch, and
+GST filing. Must comply with GST Rule 46.
+ Section
+ Content / Data Source
+ Notes
+Header Band
+Company name, GSTIN, address, logo — from
+companies table
+Mandatory GST Rule 46
+Document Title
+'TAX INVOICE' in bold caps centred
+Rule 46 mandatory label
+Invoice Meta
+Invoice No, Invoice Date, Due Date, Place of Supply,
+Reverse Charge Y/N
+All from invoices table
+
+--- Page 5 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 5
+ Section
+ Content / Data Source
+ Notes
+Customer Block
+Bill-to: company_name, GSTIN, address, state code.
+Ship-to if different
+customers + invoice fields
+Line Items
+Table
+Sr, Item, HSN/SAC, Qty, UOM, Unit Price, Discount,
+Taxable Amt
+invoice_items joined items
+GST Breakup
+Per HSN row: CGST Rate+Amt, SGST Rate+Amt OR
+IGST Rate+Amt
+Computed from tax_type
+Totals Block
+Subtotal, Discount, Taxable Total, CGST, SGST/IGST,
+TCS, Round-off, Grand Total
+All system-calculated
+Amount in
+Words
+■ [Grand Total] Only — auto-generated via
+NumberToWords helper
+invoices.amount_in_words
+Bank Details
+Company bank name, account no, IFSC for NEFT
+payment
+companies.bank_* fields
+e-Invoice
+Block
+IRN (64-char hash), Ack No, Ack Date, QR Code
+image
+Only if einvoice_enabled
+e-Way Bill
+EWB number if applicable (goods > 50,000 or
+inter-state)
+invoices.eway_bill_number
+Signature
+Block
+'For [Company Name]' + 'Authorised Signatory'
+Static text
+Footer
+T&C;, page number, 'Computer generated invoice'
+From company settings
+■ e-Invoice Rule: If company.einvoice_enabled = true AND invoice is B2B, the system MUST obtain IRN from the IRP
+(Invoice Registration Portal) API BEFORE generating the final PDF. The QR code returned by IRP is embedded as a
+base64 image in the PDF. Draft PDFs without IRN are watermarked 'NOT VALIDATED'.
+21.3 Purchase Order PDF
+Generated when PO status moves to APPROVED or SENT. Sent to vendor via email + WhatsApp.
+ Section
+ Content / Data Source
+Header
+Company name, address, GSTIN, logo
+Document Title
+'PURCHASE ORDER' centred
+PO Meta
+PO Number, PO Date, Expected Delivery Date, Payment Terms
+Vendor Block
+Vendor company name, contact, GSTIN, address — from vendors table
+Delivery To
+Warehouse name + address — from warehouses table
+Line Items
+Sr, Item Code, Description, HSN, Qty, UOM, Unit Price, GST%, Total
+Tax Summary
+CGST/SGST or IGST breakdown same as invoice
+Totals
+Subtotal, Tax, Grand Total, Amount in Words
+Terms Block
+Payment terms, delivery terms, quality standards (free text from PO notes)
+
+--- Page 6 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 6
+ Section
+ Content / Data Source
+Approval Block
+Approved by (name + designation), approval date, digital stamp placeholder
+Footer
+'This PO is subject to terms and conditions on reverse.' Page no.
+21.4 Goods Receipt Note (GRN) PDF
+Internal document. Generated after GRN is POSTED. Used for 3-way matching and QC record.
+ Section
+ Content
+Header
+Company logo, name, GRN number, date, warehouse name
+Reference Block
+Linked PO Number, Vendor name, Vehicle No, LR Number
+Items Received
+Item code, name, PO qty, Received qty, Accepted qty, Rejected qty, Batch/Serial, Expiry Date
+QC Section
+QC status per line (PASS/FAIL/PARTIAL), QC remarks, QC officer name
+Variance
+Any qty discrepancy highlighted in red
+Posting Block
+Posted by (user), posted at timestamp — immutable record proof
+Footer
+GRN number + barcode (code128) for scanning
+21.5 Quotation PDF
+ Section
+ Content
+Header
+Company details, 'QUOTATION' title, Quotation No, Date, Valid Until date
+Customer
+Company name, address, contact person, GSTIN
+Line Items
+Sr, Product, Description, HSN, Qty, UOM, Unit Price, Discount%, GST%, Amount
+Tax Summary
+GST breakup (indicative — final tax calculated on invoice)
+Totals
+Subtotal, Discount, Tax, Total — with 'Indicative pricing' watermark note
+Terms
+Payment terms, validity, delivery timeline, special conditions from quotation.notes
+Footer
+'Valid until [date]. Subject to availability. Prices exclusive of freight unless stated.'
+21.6 Delivery Challan PDF
+Accompanies goods during transit. Required for e-Way Bill. Generated at dispatch step.
+ Section
+ Content
+Header
+Company name, GSTIN, address, 'DELIVERY CHALLAN' title
+Challan Meta
+Challan No, Date, Related Sales Order No, Related Invoice No
+From–To
+Ship from: Warehouse address. Ship to: Customer shipping address
+
+--- Page 7 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 7
+ Section
+ Content
+Transport
+Transporter name, vehicle number, LR/docket number, e-Way Bill number
+Items
+Item, Description, HSN, Qty, UOM — NO prices (challan is not a tax document)
+Declaration
+'Goods dispatched for delivery only. No commercial transaction.'
+Signature
+Driver signature, receiver signature (blank box), company stamp
+21.7 Payslip / Salary Slip PDF
+Generated for each employee during payroll run. Delivered via WhatsApp (WA-12). Password-protected with
+employee's DOB (DDMMYYYY) if encryption enabled.
+ Section
+ Content / Data Source
+ Notes
+Header
+Company name, logo, 'SALARY SLIP' — Month &
+Year prominent
+Employee Block
+Employee Code, Name, Designation, Department,
+Date of Joining, Bank A/c ****last4
+employees table
+Attendance Box
+Working days in month, Present, Absent, LOP (Loss of
+Pay) days, Leave taken (type-wise)
+attendance +
+leave_applications
+Earnings Table
+Basic Salary, HRA, Conveyance, Special Allowance,
+Overtime, Other Allowances — each row with amount
+payroll_details
+Deductions Table
+PF Employee (12%), ESI Employee (0.75%),
+Professional Tax, TDS, LOP deduction, Advance
+recovery, Other — each with amount
+payroll_details
+Employer Share
+PF Employer (12%), ESI Employer (3.25%) — shown
+for reference, NOT deducted from salary
+payroll_details
+Net Pay Block
+Gross Earnings, Total Deductions, NET PAY in box —
+prominent font
+payroll_details.net_salary
+Amount Words
+Net Pay in words
+Auto-generated
+PF Details
+UAN number, PF number, EPF wages, EPS wages —
+for PF reporting
+employees.pf_number +
+uan
+ESI Details
+ESI number, ESI wages — only if applicable (gross <=
+21,000)
+employees.esi_number
+Footer
+'This is a computer-generated payslip. No signature
+required.' + company seal
+PF Calculation Logic: PF applies only if employee.basic_salary <= ■15,000. Employee contribution = 12% of basic (max
+■1,800). Employer contribution = 12% of basic (split: 8.33% to EPS, 3.67% to EPF). If basic > ■15,000, PF is optional —
+flag stored in employees.pf_opted_in.
+ESI Calculation Logic: ESI applies if gross salary <= ■21,000. Employee = 0.75% of gross. Employer = 3.25% of gross.
+Calculated on actual gross including allowances.
+
+--- Page 8 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 8
+21.8 Payroll Summary Report PDF
+Management-level report per payroll run. One row per employee, summary totals at bottom.
+ Column
+ Description
+Emp Code + Name
+From employees table
+Department
+From departments table
+Working Days
+Calendar days − holidays − LOP
+Present Days
+From attendance table
+LOP Days
+Loss of Pay days this month
+Gross Salary
+Sum of all earnings
+PF (EE)
+Employee PF deduction
+ESI (EE)
+Employee ESI deduction
+Prof. Tax
+State professional tax slab
+TDS
+Income tax deducted at source
+Other Deductions
+Advances, loan EMIs, etc.
+Total Deductions
+Sum of all deductions
+Net Salary
+Gross − Total Deductions
+Bank A/c
+Last 4 digits + IFSC for payment
+Payment Status
+PENDING / PAID / HOLD
+The final row shows department-wise and company-total aggregates. A separate statutory summary box shows
+total PF payable to EPFO and total ESI payable to ESIC.
+21.9 Stock Ledger Report PDF
+Item-wise, date-range filtered report showing all stock movements. Running balance column enables audit trail
+verification.
+ Column
+ Description
+Date
+Transaction date
+Transaction
+Type
+GRN_IN / SALES_OUT / PRODUCTION_OUT / TRANSFER_IN etc.
+Reference
+Source document number (PO/GRN/SO/PRD)
+Party
+Vendor / Customer / Internal depending on type
+Batch / Serial
+If batch/serial tracked
+Qty In
+Stock added (positive movement)
+Qty Out
+Stock removed (negative movement)
+Balance Qty
+Running balance — critical for audit
+
+--- Page 9 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 9
+ Column
+ Description
+Unit Cost
+Cost at time of transaction (weighted average)
+Value
+Qty × Unit Cost
+21.10 GSTR-1 / GSTR-3B Export PDF
+Month-end compliance reports. The actual filing is done on the GST portal via JSON export, but the PDF serves
+as a printed record and review copy.
+ Report Section
+ GSTR-1 Content
+ GSTR-3B Content
+B2B Invoices
+All GST invoices to registered buyers
+(GSTIN-wise)
+Not applicable
+B2C Large
+Inter-state invoices to unregistered
+(>■2.5L)
+Not applicable
+B2C Small
+Intra-state + small inter-state
+unregistered
+Not applicable
+CDN
+Credit/Debit Notes issued
+Included in net figures
+Tax Summary
+HSN-wise summary with
+CGST/SGST/IGST
+Tax liability summary
+Input Tax Credit
+Not in GSTR-1
+ITC claimed (purchase invoices)
+Net Tax Payable
+Not in GSTR-1
+Output Tax − ITC = Payable
+Nil-rated/Exempt
+Nil + exempt supply summary
+Included
+21.11 Vendor Statement PDF
+Account statement sent to vendor for reconciliation. Shows all POs, GRNs, invoices, and payments.
+ Column
+ Description
+Date
+Document date
+Document Type
+PO / GRN / Invoice / Payment / Debit Note / Credit Note
+Reference No
+Document number
+Debit (Dr)
+Amount owed to vendor (GRN / invoice posted)
+Credit (Cr)
+Amount paid / credit notes
+Balance
+Running balance — positive = payable to vendor
+21.12 Production Order PDF
+Shop floor document. Printed and given to production operators with BOM and instruction.
+
+--- Page 10 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 10
+ Section
+ Content
+Header
+Company name, 'PRODUCTION ORDER', Order No, Date
+Product Block
+Finished good name, item code, planned qty, UOM, target warehouse
+Schedule
+Planned start date, planned end date, batch number (if batch-tracked)
+BOM Table
+Sr, Raw Material code, name, Required Qty per unit, Total Qty for this order, Current Stock,
+Status (OK / SHORT)
+Special Instructions
+Free text from production_orders.notes
+Sign-off Block
+Supervisor name, Released by, Completed by — all with date/time fields
+QC Checklist
+Pre-defined quality checkpoints with Pass/Fail checkboxes
+21.13 PDF Security & Delivery
+ Aspect
+ Specification
+Watermark
+Drafts and cancelled documents watermarked 'DRAFT' or 'CANCELLED' diagonally in red
+Password Protection
+Payslips optionally encrypted with employee DOB (DDMMYYYY) as password
+Signed URLs
+All download links are Laravel signed routes with 24-hour expiry
+Storage
+storage/app/documents/{module}/{YYYY-MM}/{uuid}.pdf — served via StreamedResponse
+Audit Trail
+PDF generation event logged in activity_log with user, timestamp, document reference
+Regeneration
+PDFs can be regenerated (new file, old URL invalidated). History tracked.
+WhatsApp Delivery
+PDF URL (not file) sent via WhatsApp template with signed URL. Meta stores link only.
+Email Attachment
+Invoices and payslips attached as PDF to outgoing emails via Laravel Mail
+
+--- Page 11 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 11
+CHAPTER 22
+Live End-to-End Use Cases
+This chapter walks through complete, realistic scenarios as they happen day-to-day in an Indian
+manufacturing company. Each use case names the actors, the trigger, every system step, the documents
+generated, and the notifications fired — giving the engineering and QA team a concrete script for
+development and testing.
+22.1 Use Case: Full Procurement Cycle — Pharma Raw Material
+Company
+Suncure Pharma Pvt. Ltd., Ahmedabad (Gujarat — State 24)
+Industry
+Pharmaceuticals
+Actors
+Ravi (Store Keeper), Priya (Purchase Manager), Mehul (Accountant), VitroChem Suppliers (Vendor)
+Trigger
+Paracetamol API stock falls below reorder level of 50 kg
+1
+System Fires Low-Stock Alert
+Laravel Scheduler runs CheckReorderLevels job at 8:00 AM daily. Finds Paracetamol API (item_code: RM-0042)
+stock = 38 kg < reorder_level = 50 kg. WhatsApp WA-03 fired to Priya's number: 'LOW STOCK: Paracetamol API
+— 38 kg remaining. Reorder qty: 200 kg.'
+2
+Ravi Raises Purchase Requisition
+Ravi logs in, navigates to Purchase → New Requisition. Selects item RM-0042, qty 200 kg, required date 3 days
+from today, notes 'Urgent — production scheduled for next week'. PR/2026-04/0023 created. Status:
+PENDING_APPROVAL.
+3
+Priya Approves PR
+Priya receives system notification. Reviews PR. Checks current price history. Clicks Approve. PR status →
+APPROVED. Ravi's WhatsApp: 'Your PR/2026-04/0023 has been approved.'
+4
+Priya Creates Purchase Order
+Priya clicks 'Convert to PO' from approved PR. Vendor VitroChem Suppliers auto-selected (preferred vendor for
+RM-0042). Unit price ■420/kg, GST 18% (CGST 9% + SGST 9% — intra-state). PO total = 200 kg × ■420 +
+■15,120 GST = ■99,120. PO/2026-04/0018 created. Status: DRAFT.
+5
+PO Approval Workflow
+PO amount ■99,120 > approval threshold ■50,000 (configured). System routes to Admin for approval. Admin
+reviews and approves. Status → APPROVED. Multi-level approval log recorded in po_approvals table. WhatsApp
+WA-01 to vendor: 'PO/2026-04/0018 approved. Amount ■99,120. Delivery by [date]. View on portal.'
+6
+Vendor Accepts via Portal
+VitroChem logs in to vendor portal. Views PO details. Clicks 'Accept'. Portal updates PO status → SENT. Priya's
+WhatsApp: 'Vendor VitroChem has accepted PO/2026-04/0018.'
+7
+Goods Arrive — GRN Created
+3 days later, truck arrives with 195 kg (5 kg short-shipped). Ravi creates GRN against PO/2026-04/0018 in
+Warehouse module. Enters: Received 195 kg, Vehicle no GJ-01-AX-4521, LR no LR/VITRO/2026/0441. QC: 190
+kg passed, 5 kg rejected (moisture issue — photo attached). GRN/2026-04/0019 created. Status: DRAFT.
+
+--- Page 12 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 12
+8
+Ravi Posts the GRN
+Ravi clicks Post GRN. System: (a) Creates stock_ledger entry — GRN_IN, 190 kg, WH-MAIN, batch B-20260419.
+(b) Creates AP invoice for 190 kg × ■420 = ■79,800 + GST ■14,364 = ■94,164. Journal entry auto-posted: Dr
+Inventory ■79,800, Dr GST Input ■14,364 / Cr Accounts Payable ■94,164. PDF GRN generated. WhatsApp
+WA-04 to Priya: 'GRN posted against PO/2026-04/0018. 190 kg accepted.'
+9
+3-Way Match
+Mehul (Accountant) receives vendor invoice via email for ■94,164. Enters invoice in system against
+GRN/2026-04/0019. System performs 3-way match: PO qty 200 → GRN qty 190 → Vendor invoice qty 190.
+Match successful. AP entry confirmed. Payment scheduled Net-30 per vendor terms.
+1
+0
+Payment Processed
+On day 30, Mehul clicks Pay on AP entry. Records NEFT payment ■94,164. Bank UTR: SBIN0000001234567.
+AP cleared. Bank ledger updated. WhatsApp WA-08 to vendor: 'Payment of ■94,164 sent. UTR:
+SBIN0000001234567.' PO status → RECEIVED (partial — 5 kg short). Debit note raised for 5 kg rejection.
+Documents Generated in this Use Case:
+Document
+Reference No
+PDF Generated?
+Purchase Requisition
+PR/2026-04/0023
+No (internal record)
+Purchase Order
+PO/2026-04/0018
+Yes — sent to vendor
+Goods Receipt Note
+GRN/2026-04/0019
+Yes — internal QC record
+Vendor AP Invoice
+Auto-created
+No (system record)
+Payment Receipt
+PAY/2026-04/0031
+Yes — sent to vendor via WA
+22.2 Use Case: Sales Order to Cash — Auto Parts Distributor
+Company
+Bharat Auto Components Ltd., Pune (Maharashtra — State 27)
+Customer
+Rajasthan Auto Traders, Jaipur (Rajasthan — State 08)  ← inter-state, IGST applies
+Actors
+Deepak (Sales Manager), Anita (Warehouse), Mehul (Accountant)
+Trigger
+Customer WhatsApp: 'Need 500 pcs Brake Pads (SKU: FG-0078) urgently'
+1
+Deepak Creates Quotation
+Deepak opens Sales → New Quotation. Selects customer Rajasthan Auto Traders (state 08). System detects:
+Seller state 27 ≠ Buyer state 08 → IGST applicable. Enters 500 pcs Brake Pad FG-0078 @ ■185/pc. GST 18%
+IGST auto-applied. Subtotal ■92,500 + IGST ■16,650 = Total ■1,09,150. QT/2026-04/0041 created. Quotation
+PDF generated and WhatsApp-shared to customer.
+2
+Customer Accepts — Convert to Sales Order
+Customer replies 'Approved'. Deepak clicks 'Convert to Sales Order'. System runs credit limit check: Customer
+credit limit ■2,00,000. Credit used ■65,000. New order ■1,09,150. Total ■1,74,150 < ■2,00,000. ✓ Pass.
+SO/2026-04/0038 created. 500 pcs of FG-0078 soft-reserved in WH-PUNE inventory. Status: CONFIRMED.
+
+--- Page 13 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 13
+3
+Anita Picks & Packs
+Anita receives pick list notification. Navigates to Warehouse → Sales Orders → SO-0038. Scans barcode of
+Brake Pad boxes (batch B-20260301). Confirms 500 pcs picked. Packaging details: 10 boxes × 50 pcs. Weight:
+25 kg. Delivery challan generated. Status → PROCESSING.
+4
+e-Way Bill Generated
+Order value ■1,09,150 > ■50,000 AND inter-state → e-Way Bill mandatory. System calls NIC e-Way Bill API with
+transporter GJ02EX9999, distance 600 km. EWB No: 461234567890 returned and stored on Sales Order.
+Validity: 1 day (distance < 700 km by road).
+5
+Invoice Posted + IRN Generated
+Deepak clicks Generate Invoice. System: (1) Creates GST invoice INV/2026-04/0051. (2) Calls IRP e-Invoice API.
+IRN (64-char hash) + QR code returned. (3) Invoice PDF generated with IRN, QR code, EWB number embedded.
+(4) AR entry created: Dr AR ■1,09,150 / Cr Sales ■92,500 / Cr IGST Payable ■16,650. WhatsApp WA-05:
+Invoice PDF link sent to customer's WhatsApp.
+6
+Goods Dispatched
+Truck departs. Anita marks Dispatched. Stock ledger: SALES_OUT −500 pcs FG-0078 WH-PUNE. Courier:
+BlueDart, docket BDL20260419001. SO status → DISPATCHED. Customer WhatsApp: 'Order dispatched. Track:
+BDL20260419001. Invoice attached.'
+7
+Payment Collected
+Customer pays ■1,09,150 via NEFT on due date. Mehul records payment in Finance → Payments. AR entry
+cleared. Bank ledger: Dr Bank ■1,09,150 / Cr AR ■1,09,150. WhatsApp WA-07 to customer: 'Payment of
+■1,09,150 received. Receipt attached. Thank you!'
+22.3 Use Case: Production Run — Chemical Batch Manufacturing
+Company
+Chemico Industries, Vapi, Gujarat
+Product
+Sodium Hypochlorite Solution (FG-0112), BOM version v2.0 — produces 100 litres per batch
+Actors
+Nilesh (Production Supervisor), Admin
+Trigger
+Sales Order SO/2026-04/0038 confirmed but only 120 L in stock vs 200 L ordered
+BOM v2.0 for Sodium Hypochlorite (100 L batch):
+Component
+Item Code
+Qty per 100 L
+UOM
+Current Stock
+Chlorine Gas
+RM-0201
+8.5
+kg
+45 kg
+Caustic Soda Lye 48%
+RM-0202
+12.0
+kg
+80 kg
+Demineralised Water
+RM-0203
+85.0
+ltr
+500 ltr
+Stabilizer Additive
+RM-0204
+0.5
+kg
+10 kg
+1
+System Suggests Production
+When SO/2026-04/0038 confirmed for 200 L and available stock = 120 L, system auto-suggests: 'Insufficient
+stock. Create Production Order for 80 L?' Nilesh clicks Yes. PRD/2026-04/0011 created with planned_qty = 80 L
+(rounded to 100 L for efficiency). System calculates material requirement: 8.5 kg × 1 = 8.5 kg Chlorine, 12 kg
+Caustic Soda, 85 L DM Water, 0.5 kg Stabilizer.
+
+--- Page 14 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 14
+2
+Material Availability Check
+System checks stock: Chlorine 45 kg ✓, Caustic Soda 80 kg ✓, DM Water 500 L ✓, Stabilizer 10 kg ✓. All
+materials available. Status → RELEASED. Stock reservations created (soft-reserve) for all 4 raw materials.
+WhatsApp WA-09 to Nilesh: 'Production Order PRD/2026-04/0011 released. Batch: 100 L Sodium Hypochlorite.'
+3
+Nilesh Starts Production
+Nilesh logs into the tablet on shop floor. Opens Production → PRD-0011. Clicks Start Production. actual_start
+timestamp recorded. Status → IN_PROGRESS. Production Order PDF printed with BOM checklist and QC
+checkpoints.
+4
+Material Consumption Logged
+During production, Nilesh logs actual material consumption: Chlorine 8.3 kg (saved 0.2 kg), Caustic Soda 12.1 kg
+(0.1 kg extra), DM Water 85 L, Stabilizer 0.5 kg. Consumption saved in production_order_materials table.
+5
+Production Completed
+Actual output: 98 L (2 L evaporation loss — within acceptable variance 3%). Nilesh clicks Complete. actual_qty =
+98. actual_end timestamp recorded. Stock ledger: PRODUCTION_OUT for all RM consumed. PRODUCTION_IN
+for 98 L FG-0112 in WH-MAIN. Journal entry: Dr Finished Goods / Cr WIP / Cr Raw Material accounts. WhatsApp
+WA-10 to Admin: 'PRD/2026-04/0011 complete. Planned 100 L, Actual 98 L. Variance 2%.'
+6
+Sales Order Fulfilled
+With 120 L existing + 98 L new production = 218 L available > 200 L ordered. SO/2026-04/0038 can now be
+fulfilled. Warehouse picks 200 L, processes dispatch normally.
+22.4 Use Case: Monthly Payroll Processing
+Company
+Suncure Pharma Pvt. Ltd.
+Pay Period
+April 2026
+Actors
+Kavita (HR Manager), Mehul (Accountant), All Employees
+Trigger
+Last working day of April — Kavita initiates payroll run
+1
+Kavita Reviews Attendance
+HR → Attendance → April 2026 summary. Reviews daily attendance records. Finds 3 employees with
+unapproved absences. Marks 2 as LOP (Loss of Pay), 1 approved as casual leave (pre-approved application).
+Attendance locked for payroll.
+2
+Leave Reconciliation
+System reconciles approved leaves against leave balance. Casual leave balance deducted. LOP days calculated
+for each employee. HR confirms leave summary: 45 employees, total LOP days = 8 across 3 employees.
+3
+Kavita Initiates Payroll Run
+HR → Payroll → New Run → April 2026. System pre-populates all active employees. payroll_runs record created.
+Status: CALCULATING.
+4
+Auto-Calculation
+System computes for each employee: (1) Gross = Basic + HRA + Allowances − LOP deduction. (2) PF Employee
+= 12% of basic IF basic ≤ ■15,000. (3) ESI Employee = 0.75% of gross IF gross ≤ ■21,000. (4) Professional Tax
+per Maharashtra slab (■200/month if gross > ■10,000). (5) TDS as per income tax declaration. (6) Net = Gross −
+PF − ESI − PT − TDS − Other deductions. payroll_details rows created for each employee.
+
+--- Page 15 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 15
+5
+Kavita Reviews and Approves
+HR reviews payroll summary: 45 employees, total net salary ■18,42,300. Compares with last month — variance
++2.1% (3 salary increments). Approves. Status → APPROVED.
+6
+Mehul Processes Bank Transfer
+Finance → Payroll → April 2026 → Generate Payment File. NEFT/RTGS file in bank format (ICICI / HDFC
+compatible CSV) downloaded. Mehul uploads to corporate net banking. Confirms payment. All payroll_details
+records marked PAID. Journal entry posted: Dr Salary Expense ■18,42,300 / Cr Bank ■17,21,400 / Cr PF
+Payable ■72,300 / Cr ESI Payable ■14,800 / Cr PT Payable ■9,000 / Cr TDS Payable ■24,800.
+7
+Payslips Generated and Sent
+System queues payslip PDF generation for all 45 employees. Each payslip generated with employee-specific
+data. WhatsApp WA-12 fired for each employee with their payslip as PDF attachment link. 'Dear [Name], your
+salary for April 2026 ■[Net] has been credited to your account.' Payslips also available in employee self-service
+portal.
+8
+Statutory Filings
+System generates: PF challan (ECR file for EPFO portal), ESI challan (ESIC portal format), PT challan for
+Maharashtra. Mehul downloads and files before 15th of next month.
+Sample Payslip Calculation — Employee: Ramesh Patel (EMP-0023)
+Component
+Amount (■)
+Component
+Amount (■)
+Basic Salary
+14,000
+PF Employee (12%)
+1,680
+HRA
+5,600
+ESI Employee (0.75%)
+148
+Conveyance
+800
+Professional Tax
+200
+Special Allowance
+2,100
+LOP Deduction (0 days)
+0
+GROSS EARNINGS
+22,500
+TOTAL DEDUCTIONS
+2,028
+NET PAY
+20,472
+22.5 Use Case: GST Return Filing — Month-End
+Accountant Mehul prepares and verifies GSTR-1 data for April 2026 at month-end.
+1
+Lock Period
+Mehul navigates to Finance → GST → Lock Period → April 2026. System confirms no draft invoices pending for
+April. Period locked — no new invoices can be backdated.
+2
+GSTR-1 Data Verification
+Finance → GST → GSTR-1 → April 2026. System aggregates: B2B invoices (32 invoices to GST-registered
+buyers), B2C invoices (8 invoices, unregistered), Credit notes (2 issued), Nil-rated supply (1 export invoice @0%).
+Mehul reviews each section. Flags 1 invoice with missing HSN — corrects it.
+3
+Export JSON for GST Portal
+Clicks Export GSTR-1 JSON. System generates JSON in GSTN-specified schema. File downloaded:
+GSTR1_24AAICS1234P1Z5_042026.json. PDF summary report also generated for internal record.
+
+--- Page 16 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 16
+4
+GSTR-1 Filed
+Mehul logs into GST portal, uploads JSON. Verifies data. Files GSTR-1 by 11th of May. ARN (Acknowledgement
+Reference Number) noted and saved in system settings.
+5
+GSTR-3B Preparation
+Finance → GST → GSTR-3B → April 2026. System shows: Output Tax Liability ■3,84,200 (from sales). ITC
+Available ■1,47,600 (from purchases). Net Tax Payable = ■3,84,200 − ■1,47,600 = ■2,36,600.
+6
+Tax Payment and GSTR-3B Filing
+Mehul pays ■2,36,600 via GST portal challan (NEFT). PMT-06 challan generated. GSTR-3B filed by 20th May.
+ARN saved. Finance record updated with GST payment journal entry.
+22.6 Use Case: New Employee Onboarding
+1
+HR Creates Employee Record
+Kavita navigates to HR → Employees → Add New. Enters: Name Suresh Mehta, DOB 12-03-1995, DOJ
+21-04-2026, Department: Production, Designation: Operator, Employment Type: FULL_TIME. Basic Salary
+■13,500 (< ■15,000 → PF applicable). PF Number: MH/ABC/1234567, ESI Number: 31-00-123456-000-0001.
+Auto-generated: EMP-0046.
+2
+User Account Created
+Kavita checks 'Create Login'. System creates user account: suresh.mehta@suncure.erp with role 'Staff/Operator'.
+Password auto-generated, sent to employee's WhatsApp. Employee linked: employees.id ↔ users.employee_id.
+3
+Leave Balance Initialized
+System auto-creates leave balance for FY 2026-27: Casual Leave 12 days, Sick Leave 7 days (pro-rated from
+April DOJ = 9 days CL, 5 days SL). Leave policy applied from department settings.
+4
+Attendance Enrollment
+Biometric device sync (if integrated) or HR manually marks attendance from DOJ. First month partial — only days
+from 21st April counted.
+5
+First Payroll Inclusion
+When May payroll runs, Suresh is automatically included. But April payroll was already processed on 30th April →
+Suresh gets April arrears processed in May's payroll (days 21-30 = 10 days). System calculates: 10/30 × ■13,500
+basic = ■4,500 arrear added to May payslip with note 'April Arrear'.
+22.7 Use Case: Warehouse Transfer & Stock Reconciliation
+Inter-warehouse transfer of Brake Pads from WH-PUNE to WH-MUMBAI and subsequent reconciliation.
+1
+Transfer Request
+Mumbai warehouse manager Anita creates Warehouse → Transfer → New. From: WH-PUNE. To: WH-MUMBAI.
+Item: FG-0078 Brake Pads. Qty: 200 pcs. Reason: Mumbai order fulfilment. Status: DRAFT.
+2
+Approval
+WH-PUNE manager Ravi approves the outward transfer. Status → APPROVED.
+3
+Stock Deducted from Source
+Ravi confirms dispatch. Stock ledger: TRANSFER_OUT −200 pcs WH-PUNE. Transfer challan PDF generated.
+Vehicle and LR number recorded.
+
+--- Page 17 ---
+ManufactureERP SRS v1.1 Addendum — Confidential
+Page 17
+4
+Receiving at Destination
+Anita receives goods at WH-MUMBAI. Confirms 198 pcs received (2 pcs damaged in transit). TRANSFER_IN
++198 pcs WH-MUMBAI. Variance of 2 pcs flagged for insurance claim. Both ledger entries reference the same
+transfer document for traceability.
+5
+Monthly Stock Reconciliation
+Admin runs Inventory → Reconciliation → WH-MUMBAI → April 2026. System computes: Opening stock + all
+GRN_IN + TRANSFER_IN − SALES_OUT − TRANSFER_OUT − PRODUCTION_OUT = Closing balance.
+Physical count entered. Variance report: 3 items with discrepancies. For each variance, system requires
+Adjustment Voucher with reason (damaged/theft/sampling/counting error). Adjustments posted as stock ledger
+ADJUSTMENT entries. Journal entries auto-posted.
+22.8 Use Case: Vendor Portal Order Acceptance
+VitroChem Suppliers receives a PO and interacts entirely through the vendor portal without any phone calls or
+emails.
+1
+Vendor Credentials Sent
+When vendor is created with portal_enabled = true, WhatsApp WA-13 auto-sent to vendor.whatsapp: 'Your
+ManufactureERP portal access: URL: erp.suncure.com/vendor | Username: vitrochem@supplier.com | Password:
+[auto-generated]. Please change on first login.'
+2
+Vendor Logs In
+VitroChem opens browser, goes to /vendor/login. Enters credentials. Forced password change on first login.
+Dashboard shows: 3 Open POs, 2 Pending Invoices, Payment status of last 5 transactions.
+3
+Vendor Reviews PO
+Vendor clicks PO/2026-04/0018. Sees all line items, delivery date, shipping address, and payment terms.
+Downloads PO PDF. Clicks 'Accept PO'. System updates PO status → SENT. Priya (Purchase Manager) gets
+WhatsApp: 'VitroChem has accepted PO/2026-04/0018.'
+4
+Vendor Uploads Invoice
+After delivering goods, VitroChem logs into portal. Goes to PO/2026-04/0018 → Upload Invoice. Enters: Vendor
+Invoice No VI-2026-0341, Invoice Date, Amount ■94,164. Uploads scanned invoice PDF. System links to
+GRN/2026-04/0019. 3-way match auto-triggered in background.
+5
+Vendor Checks Payment Status
+Vendor → Payments tab. Sees: INV VI-2026-0341 | Due: 19-May-2026 | Status: SCHEDULED. On payment day:
+Status → PAID | UTR: SBIN0000001234567. Vendor can download payment advice PDF.
+End of SRS Addendum — Chapters 21 & 22
+This document extends ManufactureERP SRS v1.0. The engineering team should treat these chapters as binding
+specifications for PDF template design, queue job implementation, and QA test case coverage. All use cases in Chapter 22
+should have corresponding end-to-end integration tests in the test suite.
+ ManufactureERP SRS v1.1 Addendum  |  Confidential  |  Engineering use only  |  May 2026

@@ -1,0 +1,453 @@
+================================================================================
+ManufactureERP — WhatsApp Message Templates for Meta Business Suite
+================================================================================
+
+Create each template in:
+  Meta Business Suite → WhatsApp Manager → Message templates → Create template
+
+GLOBAL SETTINGS (apply to every template below)
+--------------------------------------------------------------------------------
+  Language     : English  (locale code: en)
+  Category     : UTILITY  (transactional / operational alerts)
+  Components   : BODY only (no header, footer, or buttons unless you change the app)
+  Variable fmt : {{1}}, {{2}}, {{3}} … in exact order listed
+
+After approval, set in .env:
+  WHATSAPP_DRIVER=cloud
+  WABA_PHONE_NUMBER_ID=<your_phone_number_id>
+  WABA_ACCESS_TOKEN=<your_token>
+  WHATSAPP_TEMPLATE_LOCALE=en
+
+Template names must match config/whatsapp.php exactly.
+If Meta assigns a different name, update config/whatsapp.php → templates array.
+
+================================================================================
+TEST TEMPLATE (Meta built-in — for credential check only)
+================================================================================
+
+Template name : hello_world
+Language      : English (US)  →  en_US
+Category      : UTILITY
+Body variables: NONE (Meta pre-supplied)
+
+Test command  : php artisan whatsapp:test-send {phone}
+
+================================================================================
+1. po_approved
+================================================================================
+When      : Purchase order status becomes APPROVED (vendor notification)
+Recipient : Vendor phone number
+
+Template name : po_approved
+Variables     : 3
+
+BODY (copy into Meta editor):
+--------------------------------------------------------------------------------
+Hello, your purchase order {{1}} for total Rs. {{2}} has been approved. Expected delivery date: {{3}}.
+
+Thank you for your partnership.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = PO number              e.g. PO-00042
+  {{2}} = Total amount (INR)     e.g. 11800.00
+  {{3}} = Expected delivery date e.g. 2026-06-15  (or "-" if not set)
+
+================================================================================
+2. po_dispatch
+================================================================================
+When      : PO marked as SENT to vendor
+Recipient : Vendor phone number
+
+Template name : po_dispatch
+Variables     : 2
+
+BODY:
+--------------------------------------------------------------------------------
+Purchase order {{1}} has been formally sent to you for processing.
+
+Expected delivery date: {{2}}
+
+Please confirm receipt and share dispatch details when goods are shipped.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = PO number
+  {{2}} = Expected delivery date
+
+================================================================================
+3. po_staff_update  (IMPROVED — clearer status message for PO creator)
+================================================================================
+When      : PO creator notified — pending finance / fully approved / rejected
+Recipient : User who created the PO (whatsapp_number on user profile)
+
+Template name : po_staff_update
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Purchase order update — {{1}}
+
+Current status: {{2}}
+
+{{3}}
+
+Please log in to ManufactureERP to review this purchase order and take any required action (approve, reject, or follow up with finance/vendor).
+
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = PO number
+          e.g. PO-00042
+
+  {{2}} = Status headline (short label from system)
+          e.g. "Pending finance approval"
+          e.g. "Fully approved"
+          e.g. "Rejected"
+
+  {{3}} = Detail line (amount, reason, or next step)
+          e.g. "Total 50000.00 INR — awaiting finance sign-off."
+          e.g. "Total 50000.00 INR."
+          e.g. "Budget exceeded for this quarter. Please revise quantities."
+
+================================================================================
+4. pr_approved
+================================================================================
+When      : Purchase requisition APPROVED
+Recipient : Requester whatsapp_number
+
+Template name : pr_approved
+Variables     : 2
+
+BODY:
+--------------------------------------------------------------------------------
+Good news! Purchase requisition {{1}} has been approved.
+
+{{2}}
+
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = PR number  e.g. PR-00015
+  {{2}} = Fixed text: "Your requisition is approved. You may proceed to raise a PO."
+
+================================================================================
+5. pr_rejected
+================================================================================
+When      : Purchase requisition REJECTED
+Recipient : Requester whatsapp_number
+
+Template name : pr_rejected
+Variables     : 2
+
+BODY:
+--------------------------------------------------------------------------------
+Purchase requisition {{1}} was not approved.
+
+Reason: {{2}}
+
+Please review the comments, update the requisition if needed, and submit again.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = PR number
+  {{2}} = Rejection reason (max ~480 characters from system)
+
+================================================================================
+6. grn_posted
+================================================================================
+When      : Goods receipt note (GRN) POSTED
+Recipient : Purchase Manager & Warehouse Manager (users with whatsapp_number)
+
+Template name : grn_posted
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Goods receipt posted: {{1}}
+
+Vendor: {{2}}
+Items received: {{3}}
+
+Stock has been updated in the warehouse. Please verify for 3-way matching and QC records.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = GRN number   e.g. GRN-00018
+  {{2}} = Vendor name
+  {{3}} = Line summary e.g. SKU-01×10.0000, SKU-02×5.0000…
+
+================================================================================
+7. invoice_sent
+================================================================================
+When      : GST tax invoice POSTED
+Recipient : Customer phone
+
+Template name : invoice_sent
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Tax invoice {{1}} for Rs. {{2}} has been issued against your order.
+
+Payment due date: {{3}}
+
+Thank you for your business. Contact us for a PDF copy or payment instructions.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = Invoice number
+  {{2}} = Total amount
+  {{3}} = Due date (YYYY-MM-DD)
+
+================================================================================
+8. low_stock
+================================================================================
+When      : Daily low-stock scheduler (whatsapp:send-low-stock-alerts)
+Recipient : Purchase Manager & Warehouse Manager
+
+Template name : low_stock
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Low stock alert for {{1}}.
+
+Current quantity on hand: {{2}}
+Reorder level: {{3}}
+
+Please review inventory and raise a purchase requisition if replenishment is required.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = Item name
+  {{2}} = Current qty (aggregated)
+  {{3}} = Reorder level
+
+================================================================================
+9. payment_receipt
+================================================================================
+When      : Customer payment recorded against invoice
+Recipient : Customer phone
+
+Template name : payment_receipt
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+We have received your payment.
+
+Reference: {{1}}
+Amount received: Rs. {{2}}
+Outstanding balance on account: Rs. {{3}}
+
+Thank you for your payment.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = Payment reference number
+  {{2}} = Amount paid
+  {{3}} = Remaining balance
+
+================================================================================
+10. payment_sent
+================================================================================
+When      : Vendor payment processed
+Recipient : Vendor phone
+
+Template name : payment_sent
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Payment has been initiated to your account.
+
+Payment reference: {{1}}
+Amount: Rs. {{2}}
+Bank UTR / reference: {{3}}
+
+Please allow 1–2 working days for credit. Contact accounts if you have questions.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = Payment number
+  {{2}} = Amount
+  {{3}} = UTR / bank reference (or "—")
+
+================================================================================
+11. payment_overdue
+================================================================================
+When      : Scheduled overdue invoice reminder
+Recipient : Customer phone
+
+Template name : payment_overdue
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Payment reminder: Invoice {{1}} is overdue by {{2}} day(s).
+
+Amount still due: Rs. {{3}}
+
+Please arrange payment at the earliest to avoid service interruption. Contact us for payment link or bank details.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = Invoice number
+  {{2}} = Days overdue (number)
+  {{3}} = Outstanding amount
+
+================================================================================
+12. leave_approved
+================================================================================
+When      : Leave application approved
+Recipient : Employee whatsapp or phone
+
+Template name : leave_approved
+Variables     : 4
+
+BODY:
+--------------------------------------------------------------------------------
+Your leave request has been approved.
+
+From: {{1}}
+To: {{2}}
+Type: {{3}}
+Approved by: {{4}}
+
+— ManufactureERP HR
+--------------------------------------------------------------------------------
+
+  {{1}} = Start date  e.g. 01 Jun 2026
+  {{2}} = End date
+  {{3}} = Leave type
+  {{4}} = Approver name
+
+================================================================================
+13. prod_started
+================================================================================
+When      : Production work order → in_progress
+Recipient : Staff with production.log or production.order.create permission
+
+Template name : prod_started
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Production started on shop floor.
+
+Work order: {{1}}
+Product (SKU): {{2}}
+Planned quantity: {{3}}
+
+Please proceed as per BOM and work instructions.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = WO number
+  {{2}} = SKU
+  {{3}} = Planned qty
+
+================================================================================
+14. prod_complete
+================================================================================
+When      : Production work order → completed
+Recipient : Same as prod_started
+
+Template name : prod_complete
+Variables     : 3
+
+BODY:
+--------------------------------------------------------------------------------
+Production completed.
+
+Work order: {{1}}
+Product (SKU): {{2}}
+Actual quantity produced: {{3}}
+
+Please complete QC sign-off and stock posting in the system.
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = WO number
+  {{2}} = SKU
+  {{3}} = Actual qty
+
+================================================================================
+15. salary_credited
+================================================================================
+When      : Monthly payroll run processed
+Recipient : Employee whatsapp or phone
+
+Template name : salary_credited
+Variables     : 4  (fixed count — always includes payslip link after payroll)
+
+BODY:
+--------------------------------------------------------------------------------
+Dear {{1}}, your salary for {{2}} has been credited.
+
+Net pay: Rs. {{3}}
+
+Download your payslip (link valid 24 hours):
+{{4}}
+
+This is a system-generated message. Do not share the link publicly.
+— ManufactureERP HR
+--------------------------------------------------------------------------------
+
+  {{1}} = Employee name
+  {{2}} = Period YYYY-MM  e.g. 2026-05
+  {{3}} = Net salary amount
+  {{4}} = Signed payslip PDF URL
+
+================================================================================
+16. license_expiry
+================================================================================
+NOTE: Vendor portal credentials use email (VendorPortalCredentialsMail), not WhatsApp.
+
+When      : Daily license / AMC expiry scheduler
+Recipient : Super Admin & Admin users
+
+Template name : license_expiry
+Variables     : 2
+
+BODY:
+--------------------------------------------------------------------------------
+ManufactureERP license notice: expiry {{1}}.
+
+Renew or contact support before access is restricted:
+{{2}}
+
+— ManufactureERP
+--------------------------------------------------------------------------------
+
+  {{1}} = Days label  e.g. "7" or "3 days ago"
+  {{2}} = Renewal / support URL
+
+================================================================================
+QUICK REFERENCE TABLE
+================================================================================
+
+Template name      | Vars | Category
+-------------------|------|----------
+po_approved        |  3   | UTILITY
+po_dispatch        |  2   | UTILITY
+po_staff_update    |  3   | UTILITY
+pr_approved        |  2   | UTILITY
+pr_rejected        |  2   | UTILITY
+grn_posted         |  3   | UTILITY
+invoice_sent       |  3   | UTILITY
+low_stock          |  3   | UTILITY
+payment_receipt    |  3   | UTILITY
+payment_sent       |  3   | UTILITY
+payment_overdue    |  3   | UTILITY
+leave_approved     |  4   | UTILITY
+prod_started       |  3   | UTILITY
+prod_complete      |  3   | UTILITY
+salary_credited    |  4   | UTILITY
+license_expiry     |  2   | UTILITY
+hello_world        |  0   | UTILITY (Meta sample, en_US)
+
+================================================================================
+END OF FILE
+================================================================================
