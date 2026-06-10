@@ -79,3 +79,20 @@ function notifyError(message) {
         stopOnFocus: true,
     }).showToast();
 }
+
+/**
+ * Display a warning toast (bottom-right).
+ *
+ * @param {string} message
+ */
+function notifyWarning(message) {
+    Toastify({
+        text: message,
+        duration: 4000,
+        gravity: 'bottom',
+        position: 'right',
+        backgroundColor: '#ffc107',
+        style: { color: '#212529' },
+        stopOnFocus: true,
+    }).showToast();
+}
