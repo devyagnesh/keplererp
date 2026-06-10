@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
             [
                 'components.layouts.app',
                 'components.layouts.guest',
+                'components.layouts.employee',
                 'auth.login',
             ],
             CompanyBrandingComposer::class

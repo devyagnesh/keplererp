@@ -1,47 +1,53 @@
 <?php
 
+use App\Http\Controllers\Admin\AllowanceTypeController;
 use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\BatchSerialTraceabilityController;
 use App\Http\Controllers\Admin\BillOfMaterialController;
-use App\Http\Controllers\Admin\CompanyController;
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\CreditNoteController;
-use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\ChartOfAccountsController;
+use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\Admin\CreditNoteController;
 use App\Http\Controllers\Admin\CustomerAddressController;
+use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\DesignationController;
-use App\Http\Controllers\Admin\GrnReturnController;
-use App\Http\Controllers\Admin\PriceListController;
 use App\Http\Controllers\Admin\DispatchChallanController;
-use App\Http\Controllers\Admin\FinancePaymentController;
-use App\Http\Controllers\Admin\InvoiceController;
-use App\Http\Controllers\Admin\VendorInvoiceController;
-use App\Http\Controllers\Admin\LeaveApplicationController;
 use App\Http\Controllers\Admin\EmployeeController;
+use App\Http\Controllers\Admin\FinancePaymentController;
 use App\Http\Controllers\Admin\GoodsReceiptController;
+use App\Http\Controllers\Admin\GrnReturnController;
 use App\Http\Controllers\Admin\InventoryBalanceController;
 use App\Http\Controllers\Admin\InventoryStockController;
+use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\ItemController;
+use App\Http\Controllers\Admin\ItemTrackingController;
 use App\Http\Controllers\Admin\JournalVoucherController;
-use App\Http\Controllers\Admin\AllowanceTypeController;
-use App\Http\Controllers\Admin\PayrollSettingsController;
+use App\Http\Controllers\Admin\LeaveApplicationController;
+use App\Http\Controllers\Admin\PayrollDetailController;
 use App\Http\Controllers\Admin\PayrollRunController;
+use App\Http\Controllers\Admin\PayrollSettingsController;
+use App\Http\Controllers\Admin\PriceListController;
 use App\Http\Controllers\Admin\ProductionOrderController;
 use App\Http\Controllers\Admin\PurchaseOrderController;
 use App\Http\Controllers\Admin\PurchaseRequisitionController;
 use App\Http\Controllers\Admin\ReportsController;
-use App\Http\Controllers\Admin\SalesOrderController;
 use App\Http\Controllers\Admin\SalesEnquiryController;
+use App\Http\Controllers\Admin\SalesOrderController;
 use App\Http\Controllers\Admin\SalesQuotationController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\VendorInvoiceController;
 use App\Http\Controllers\Admin\WarehouseController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DocumentDownloadController;
+use App\Http\Controllers\Employee\EmployeeAttendanceController;
+use App\Http\Controllers\Employee\EmployeeDashboardController;
+use App\Http\Controllers\Employee\EmployeeLeaveController;
 use App\Http\Controllers\Employee\EmployeePayslipController;
+use App\Http\Controllers\Employee\EmployeeProfileController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\VendorPortal\PortalAuthController;
-use App\Http\Controllers\Admin\PayrollDetailController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('health');
@@ -116,7 +122,7 @@ Route::middleware('auth')->group(function (): void {
             return redirect()->route('admin.hr.payroll-runs.index');
         }
         if ($user->can('hr.payslip.view')) {
-            return redirect()->route('employee.payslips.index');
+            return redirect()->route('employee.dashboard');
         }
         if ($user->can('reports.sales') || $user->can('reports.purchase') || $user->can('reports.inventory') || $user->can('reports.finance') || $user->can('hr.employee.manage')) {
             return redirect()->route('admin.reports.index');
@@ -237,32 +243,32 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/inventory/balances/data', [InventoryBalanceController::class, 'data'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.balances.data');
-        Route::get('/admin/inventory/tracking-map', [\App\Http\Controllers\Admin\ItemTrackingController::class, 'trackingMap'])
+        Route::get('/admin/inventory/tracking-map', [ItemTrackingController::class, 'trackingMap'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.tracking-map');
-        Route::get('/admin/inventory/warehouses/{warehouse}/items/{item}/batches', [\App\Http\Controllers\Admin\ItemTrackingController::class, 'batches'])
+        Route::get('/admin/inventory/warehouses/{warehouse}/items/{item}/batches', [ItemTrackingController::class, 'batches'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.item-batches');
-        Route::get('/admin/inventory/warehouses/{warehouse}/items/{item}/serials', [\App\Http\Controllers\Admin\ItemTrackingController::class, 'serials'])
+        Route::get('/admin/inventory/warehouses/{warehouse}/items/{item}/serials', [ItemTrackingController::class, 'serials'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.item-serials');
     });
 
     Route::middleware('permission:reports.inventory')->group(function (): void {
-        Route::get('/admin/inventory/traceability', [\App\Http\Controllers\Admin\BatchSerialTraceabilityController::class, 'index'])
+        Route::get('/admin/inventory/traceability', [BatchSerialTraceabilityController::class, 'index'])
             ->name('admin.inventory.traceability.index');
-        Route::post('/admin/inventory/traceability/fefo-data', [\App\Http\Controllers\Admin\BatchSerialTraceabilityController::class, 'fefoData'])
+        Route::post('/admin/inventory/traceability/fefo-data', [BatchSerialTraceabilityController::class, 'fefoData'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.traceability.fefo-data');
-        Route::post('/admin/inventory/traceability/expiry-data', [\App\Http\Controllers\Admin\BatchSerialTraceabilityController::class, 'expiryData'])
+        Route::post('/admin/inventory/traceability/expiry-data', [BatchSerialTraceabilityController::class, 'expiryData'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.traceability.expiry-data');
-        Route::post('/admin/inventory/traceability/history-data', [\App\Http\Controllers\Admin\BatchSerialTraceabilityController::class, 'historyData'])
+        Route::post('/admin/inventory/traceability/history-data', [BatchSerialTraceabilityController::class, 'historyData'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.traceability.history-data');
-        Route::get('/admin/inventory/traceability/export/fefo', [\App\Http\Controllers\Admin\BatchSerialTraceabilityController::class, 'exportFefoCsv'])
+        Route::get('/admin/inventory/traceability/export/fefo', [BatchSerialTraceabilityController::class, 'exportFefoCsv'])
             ->name('admin.inventory.traceability.export-fefo');
-        Route::get('/admin/inventory/traceability/export/history', [\App\Http\Controllers\Admin\BatchSerialTraceabilityController::class, 'exportHistoryCsv'])
+        Route::get('/admin/inventory/traceability/export/history', [BatchSerialTraceabilityController::class, 'exportHistoryCsv'])
             ->name('admin.inventory.traceability.export-history');
     });
 
@@ -588,10 +594,21 @@ Route::middleware('auth')->group(function (): void {
             ->name('admin.hr.payroll-details.pdf');
     });
 
-    Route::middleware(['auth', 'permission:hr.payslip.view'])->prefix('employee')->name('employee.')->group(function (): void {
+    Route::middleware(['auth', 'permission:hr.payslip.view|hr.attendance.view|hr.leave.apply'])->prefix('employee')->name('employee.')->group(function (): void {
+        Route::get('/', [EmployeeDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/attendance', [EmployeeAttendanceController::class, 'index'])->name('attendance.index');
+        Route::post('/attendance/data', [EmployeeAttendanceController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('attendance.data');
+        Route::get('/leave', [EmployeeLeaveController::class, 'index'])->name('leave.index');
+        Route::post('/leave/data', [EmployeeLeaveController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('leave.data');
+        Route::post('/leave', [EmployeeLeaveController::class, 'store'])->name('leave.store');
         Route::get('/payslips', [EmployeePayslipController::class, 'index'])->name('payslips.index');
         Route::get('/payslips/{payroll_detail}/pdf', [EmployeePayslipController::class, 'downloadPdf'])
             ->name('payslips.pdf');
+        Route::get('/profile', [EmployeeProfileController::class, 'show'])->name('profile.show');
     });
 });
 

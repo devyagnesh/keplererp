@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Employee;
 
 use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Controller;
-use App\Models\Employee;
+use App\Http\Controllers\Employee\Concerns\ResolvesLinkedEmployee;
 use App\Models\PayrollDetail;
 use App\Services\Pdf\PdfGeneratorService;
 use Illuminate\Http\Request;
@@ -16,6 +16,8 @@ use Illuminate\View\View;
  */
 class EmployeePayslipController extends Controller
 {
+    use ResolvesLinkedEmployee;
+
     public function __construct(
         protected PdfGeneratorService $pdfGenerator
     ) {}
@@ -31,7 +33,7 @@ class EmployeePayslipController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        return view('employee.payslips-index', [
+        return view('employee.payslips.index', [
             'employee' => $employee,
             'details' => $details,
         ]);
@@ -55,24 +57,5 @@ class EmployeePayslipController extends Controller
             $payrollDetail,
             $request->user()?->id
         );
-    }
-
-    protected function resolveEmployee(Request $request): Employee
-    {
-        $user = $request->user();
-        if ($user === null) {
-            abort(403);
-        }
-
-        $employee = Employee::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
-
-        if ($employee === null) {
-            abort(403, 'No employee profile is linked to your account.');
-        }
-
-        return $employee;
     }
 }

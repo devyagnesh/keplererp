@@ -14,7 +14,7 @@ class LeaveApplicationPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('hr.employee.manage');
+        return $user->can('hr.employee.manage') || $user->can('hr.leave.apply');
     }
 
     public function approve(User $user, LeaveApplication $leaveApplication): bool

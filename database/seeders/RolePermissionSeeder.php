@@ -59,6 +59,8 @@ class RolePermissionSeeder extends Seeder
             'hr.attendance.mark',
             'hr.payroll.run',
             'hr.payslip.view',
+            'hr.attendance.view',
+            'hr.leave.apply',
             'reports.sales',
             'reports.purchase',
             'reports.inventory',
@@ -143,6 +145,8 @@ class RolePermissionSeeder extends Seeder
             ],
             'Employee' => [
                 'hr.payslip.view',
+                'hr.attendance.view',
+                'hr.leave.apply',
             ],
         ];
 

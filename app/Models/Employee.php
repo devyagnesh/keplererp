@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $phone
  * @property string|null $department
  * @property string|null $designation
- * @property \Illuminate\Support\Carbon|null $join_date
+ * @property Carbon|null $join_date
  * @property int|null $user_id
  * @property bool $is_active
  * @property string $basic_salary
@@ -94,5 +95,13 @@ class Employee extends Model
     public function attendanceEntries(): HasMany
     {
         return $this->hasMany(AttendanceEntry::class);
+    }
+
+    /**
+     * @return HasMany<LeaveApplication, $this>
+     */
+    public function leaveApplications(): HasMany
+    {
+        return $this->hasMany(LeaveApplication::class);
     }
 }
