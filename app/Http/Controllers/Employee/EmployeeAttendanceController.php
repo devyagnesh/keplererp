@@ -146,10 +146,10 @@ class EmployeeAttendanceController extends Controller
 
     public function data(Request $request): JsonResponse
     {
-        try {
-            $employee = $this->resolveEmployee($request);
-            $this->authorize('viewAny', AttendanceEntry::class);
+        $employee = $this->resolveEmployee($request);
+        $this->authorize('viewAny', AttendanceEntry::class);
 
+        try {
             $monthInput = $request->input('month', now()->format('Y-m'));
             $month = is_string($monthInput) && preg_match('/^\d{4}-\d{2}$/', $monthInput)
                 ? Carbon::createFromFormat('Y-m', $monthInput)->startOfMonth()
@@ -161,25 +161,27 @@ class EmployeeAttendanceController extends Controller
 
             $selectColumns = [
                 'attendance_entries.id',
-                'work_date',
-                'status',
-                'created_at',
+                'attendance_entries.work_date',
+                'attendance_entries.status',
+                'attendance_entries.created_at',
             ];
 
-            if (Schema::hasColumn('attendance_entries', 'check_in_at')) {
-                $selectColumns = array_merge($selectColumns, [
-                    'check_in_at',
-                    'check_out_at',
-                    'check_in_latitude',
-                    'check_in_longitude',
-                    'check_out_latitude',
-                    'check_out_longitude',
-                    'check_in_accuracy_m',
-                    'check_out_accuracy_m',
-                    'check_in_address',
-                    'check_out_address',
-                    'source',
-                ]);
+            foreach ([
+                'check_in_at',
+                'check_out_at',
+                'check_in_latitude',
+                'check_in_longitude',
+                'check_out_latitude',
+                'check_out_longitude',
+                'check_in_accuracy_m',
+                'check_out_accuracy_m',
+                'check_in_address',
+                'check_out_address',
+                'source',
+            ] as $column) {
+                if (Schema::hasColumn('attendance_entries', $column)) {
+                    $selectColumns[] = 'attendance_entries.'.$column;
+                }
             }
 
             $query = AttendanceEntry::query()
@@ -233,7 +235,10 @@ class EmployeeAttendanceController extends Controller
                 'data' => $data,
             ]);
         } catch (Throwable $e) {
-            Log::error('EmployeeAttendanceController@data failed', ['message' => $e->getMessage()]);
+            Log::error('EmployeeAttendanceController@data failed', [
+                'message' => $e->getMessage(),
+                'employee_id' => $employee->id,
+            ]);
 
             return response()->json([
                 'draw' => (int) $request->input('draw', 1),
@@ -241,7 +246,7 @@ class EmployeeAttendanceController extends Controller
                 'recordsFiltered' => 0,
                 'data' => [],
                 'error' => 'Could not load attendance records.',
-            ], 500);
+            ]);
         }
     }
 }

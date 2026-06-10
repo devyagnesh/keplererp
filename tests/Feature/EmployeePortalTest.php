@@ -119,6 +119,12 @@ class EmployeePortalTest extends TestCase
             'employee_id' => $employee->id,
             'work_date' => now()->toDateString(),
             'status' => 'present',
+            'source' => 'self_service',
+            'check_in_at' => now(),
+            'check_in_latitude' => '23.02251234',
+            'check_in_longitude' => '72.57136278',
+            'check_in_accuracy_m' => '8.500',
+            'check_in_address' => 'Law Garden, Ahmedabad, Gujarat, India',
         ]);
         AttendanceEntry::query()->create([
             'employee_id' => $other->id,
@@ -138,6 +144,7 @@ class EmployeePortalTest extends TestCase
         $data = $response->json('data');
         $this->assertCount(1, $data);
         $this->assertSame('present', $data[0]['status']);
+        $this->assertStringContainsString('Law Garden', $data[0]['check_in_location']);
     }
 
     public function test_employee_leave_data_is_scoped_to_self(): void

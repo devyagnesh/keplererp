@@ -41,6 +41,13 @@ $(function () {
             data: function (d) {
                 d.month = currentMonth();
                 d.status = currentStatus();
+                d._token = $('meta[name="csrf-token"]').attr('content');
+            },
+            error: function (xhr) {
+                var message =
+                    (xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)) ||
+                    'Could not load attendance records.';
+                notifyError(message);
             },
         },
         columns: [
