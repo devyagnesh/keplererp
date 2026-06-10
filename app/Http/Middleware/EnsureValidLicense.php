@@ -39,6 +39,11 @@ class EnsureValidLicense
             return $next($request);
         }
 
+        $routeName = $request->route()?->getName() ?? '';
+        if (str_ends_with($routeName, '.data')) {
+            return $next($request);
+        }
+
         if ($request->expectsJson()) {
             return response()->json([
                 'status' => false,

@@ -9,7 +9,9 @@ class AttendanceEntryPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('hr.attendance.mark') || $user->can('hr.attendance.view');
+        return $user->can('hr.attendance.mark')
+            || $user->can('hr.attendance.view')
+            || $user->can('hr.attendance.self_mark');
     }
 
     public function view(User $user, AttendanceEntry $attendanceEntry): bool

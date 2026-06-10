@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Throwable;
 
@@ -145,77 +146,101 @@ class EmployeeAttendanceController extends Controller
 
     public function data(Request $request): JsonResponse
     {
-        $employee = $this->resolveEmployee($request);
-        $this->authorize('viewAny', AttendanceEntry::class);
+        try {
+            $employee = $this->resolveEmployee($request);
+            $this->authorize('viewAny', AttendanceEntry::class);
 
-        $monthInput = $request->input('month', now()->format('Y-m'));
-        $month = is_string($monthInput) && preg_match('/^\d{4}-\d{2}$/', $monthInput)
-            ? Carbon::createFromFormat('Y-m', $monthInput)->startOfMonth()
-            : now()->startOfMonth();
+            $monthInput = $request->input('month', now()->format('Y-m'));
+            $month = is_string($monthInput) && preg_match('/^\d{4}-\d{2}$/', $monthInput)
+                ? Carbon::createFromFormat('Y-m', $monthInput)->startOfMonth()
+                : now()->startOfMonth();
 
-        $start = $month->copy()->startOfMonth()->toDateString();
-        $end = $month->copy()->endOfMonth()->toDateString();
-        $status = $request->input('status');
+            $start = $month->copy()->startOfMonth()->toDateString();
+            $end = $month->copy()->endOfMonth()->toDateString();
+            $status = $request->input('status');
 
-        $query = AttendanceEntry::query()
-            ->select([
+            $selectColumns = [
                 'attendance_entries.id',
                 'work_date',
                 'status',
-                'check_in_at',
-                'check_out_at',
-                'check_in_latitude',
-                'check_in_longitude',
-                'check_out_latitude',
-                'check_out_longitude',
-                'check_in_accuracy_m',
-                'check_out_accuracy_m',
-                'source',
                 'created_at',
-            ])
-            ->where('employee_id', $employee->id)
-            ->whereBetween('work_date', [$start, $end]);
-
-        $baseCount = AttendanceEntry::query()
-            ->where('employee_id', $employee->id)
-            ->whereBetween('work_date', [$start, $end]);
-
-        if (is_string($status) && $status !== '') {
-            $query->where('status', $status);
-            $baseCount->where('status', $status);
-        }
-
-        $payload = ErpDataTable::run(
-            $query,
-            $request,
-            function ($q, string $term): void {
-                $q->where('status', 'like', '%'.$term.'%');
-            },
-            ['work_date', 'status', 'check_in_at', 'created_at'],
-            'work_date',
-            'desc',
-            $baseCount,
-        );
-
-        $data = $payload['rows']->map(function (AttendanceEntry $row) {
-            return [
-                'work_date' => $row->work_date?->format('Y-m-d'),
-                'status' => $row->status,
-                'check_in' => $row->check_in_at?->format('H:i:s') ?? '—',
-                'check_out' => $row->check_out_at?->format('H:i:s') ?? '—',
-                'check_in_location' => $this->formatCoordinates($row->check_in_latitude, $row->check_in_longitude, $row->check_in_accuracy_m),
-                'check_out_location' => $this->formatCoordinates($row->check_out_latitude, $row->check_out_longitude, $row->check_out_accuracy_m),
-                'source' => $row->source,
-                'created_at' => $row->created_at?->format('Y-m-d H:i'),
             ];
-        })->values()->all();
 
-        return response()->json([
-            'draw' => $payload['draw'],
-            'recordsTotal' => $payload['recordsTotal'],
-            'recordsFiltered' => $payload['recordsFiltered'],
-            'data' => $data,
-        ]);
+            if (Schema::hasColumn('attendance_entries', 'check_in_at')) {
+                $selectColumns = array_merge($selectColumns, [
+                    'check_in_at',
+                    'check_out_at',
+                    'check_in_latitude',
+                    'check_in_longitude',
+                    'check_out_latitude',
+                    'check_out_longitude',
+                    'check_in_accuracy_m',
+                    'check_out_accuracy_m',
+                    'source',
+                ]);
+            }
+
+            $query = AttendanceEntry::query()
+                ->select($selectColumns)
+                ->where('employee_id', $employee->id)
+                ->whereBetween('work_date', [$start, $end]);
+
+            $baseCount = AttendanceEntry::query()
+                ->where('employee_id', $employee->id)
+                ->whereBetween('work_date', [$start, $end]);
+
+            if (is_string($status) && $status !== '') {
+                $query->where('status', $status);
+                $baseCount->where('status', $status);
+            }
+
+            $orderableColumns = ['work_date', 'status', 'created_at'];
+            if (Schema::hasColumn('attendance_entries', 'check_in_at')) {
+                $orderableColumns[] = 'check_in_at';
+            }
+
+            $payload = ErpDataTable::run(
+                $query,
+                $request,
+                function ($q, string $term): void {
+                    $q->where('status', 'like', '%'.$term.'%');
+                },
+                $orderableColumns,
+                'work_date',
+                'desc',
+                $baseCount,
+            );
+
+            $data = $payload['rows']->map(function (AttendanceEntry $row) {
+                return [
+                    'work_date' => $row->work_date?->format('Y-m-d'),
+                    'status' => $row->status,
+                    'check_in' => $row->check_in_at?->format('H:i:s') ?? '—',
+                    'check_out' => $row->check_out_at?->format('H:i:s') ?? '—',
+                    'check_in_location' => $this->formatCoordinates($row->check_in_latitude, $row->check_in_longitude, $row->check_in_accuracy_m),
+                    'check_out_location' => $this->formatCoordinates($row->check_out_latitude, $row->check_out_longitude, $row->check_out_accuracy_m),
+                    'source' => $row->source ?? '—',
+                    'created_at' => $row->created_at?->format('Y-m-d H:i'),
+                ];
+            })->values()->all();
+
+            return response()->json([
+                'draw' => $payload['draw'],
+                'recordsTotal' => $payload['recordsTotal'],
+                'recordsFiltered' => $payload['recordsFiltered'],
+                'data' => $data,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('EmployeeAttendanceController@data failed', ['message' => $e->getMessage()]);
+
+            return response()->json([
+                'draw' => (int) $request->input('draw', 1),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+                'error' => 'Could not load attendance records.',
+            ], 500);
+        }
     }
 
     private function formatCoordinates(?string $lat, ?string $lng, ?string $accuracy): string
