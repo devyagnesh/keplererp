@@ -5,6 +5,7 @@ namespace App\Services\Employee;
 use App\Models\AttendanceEntry;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\Geocoding\ReverseGeocodingService;
 use Illuminate\Support\Carbon;
 
 /**
@@ -12,6 +13,10 @@ use Illuminate\Support\Carbon;
  */
 class EmployeeAttendanceCheckService
 {
+    public function __construct(
+        protected ReverseGeocodingService $geocoding
+    ) {}
+
     /**
      * @param  array<string, mixed>  $geo
      */
@@ -27,6 +32,10 @@ class EmployeeAttendanceCheckService
             throw new \RuntimeException('You have already checked in today.');
         }
 
+        $latitude = (float) $geo['latitude'];
+        $longitude = (float) $geo['longitude'];
+        $address = $this->geocoding->resolveAddress($latitude, $longitude);
+
         $entry->fill([
             'status' => 'present',
             'source' => 'self_service',
@@ -36,7 +45,8 @@ class EmployeeAttendanceCheckService
             'check_in_longitude' => $geo['longitude'],
             'check_in_accuracy_m' => $geo['accuracy_m'],
             'check_in_altitude_m' => $geo['altitude_m'],
-            'check_in_meta' => $geo,
+            'check_in_address' => $address,
+            'check_in_meta' => array_merge($geo, ['resolved_address' => $address]),
         ]);
         $entry->save();
 
@@ -62,13 +72,18 @@ class EmployeeAttendanceCheckService
             throw new \RuntimeException('You have already checked out today.');
         }
 
+        $latitude = (float) $geo['latitude'];
+        $longitude = (float) $geo['longitude'];
+        $address = $this->geocoding->resolveAddress($latitude, $longitude);
+
         $entry->update([
             'check_out_at' => now(),
             'check_out_latitude' => $geo['latitude'],
             'check_out_longitude' => $geo['longitude'],
             'check_out_accuracy_m' => $geo['accuracy_m'],
             'check_out_altitude_m' => $geo['altitude_m'],
-            'check_out_meta' => $geo,
+            'check_out_address' => $address,
+            'check_out_meta' => array_merge($geo, ['resolved_address' => $address]),
             'marked_by_user_id' => $user->id,
         ]);
 
@@ -102,9 +117,13 @@ class EmployeeAttendanceCheckService
             'check_in_latitude' => $entry?->check_in_latitude,
             'check_in_longitude' => $entry?->check_in_longitude,
             'check_in_accuracy_m' => $entry?->check_in_accuracy_m,
+            'check_in_address' => $entry?->check_in_address,
+            'check_in_map_url' => $entry?->checkInMapUrl(),
             'check_out_latitude' => $entry?->check_out_latitude,
             'check_out_longitude' => $entry?->check_out_longitude,
             'check_out_accuracy_m' => $entry?->check_out_accuracy_m,
+            'check_out_address' => $entry?->check_out_address,
+            'check_out_map_url' => $entry?->checkOutMapUrl(),
             'status' => $entry?->status,
         ];
     }

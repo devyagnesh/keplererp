@@ -28,10 +28,28 @@
                             <div>
                                 <div class="text-muted fs-12">Check-in</div>
                                 <div class="fw-semibold" id="todayCheckInTime">{{ $todayStatus['check_in_at'] ?? '—' }}</div>
+                                <div class="text-muted fs-11 mt-1" id="todayCheckInAddress">
+                                    @if (! empty($todayStatus['check_in_address']))
+                                        {{ $todayStatus['check_in_address'] }}
+                                    @elseif (! empty($todayStatus['check_in_latitude']))
+                                        {{ number_format((float) $todayStatus['check_in_latitude'], 6) }}, {{ number_format((float) $todayStatus['check_in_longitude'], 6) }}
+                                    @else
+                                        —
+                                    @endif
+                                </div>
                             </div>
                             <div>
                                 <div class="text-muted fs-12">Check-out</div>
                                 <div class="fw-semibold" id="todayCheckOutTime">{{ $todayStatus['check_out_at'] ?? '—' }}</div>
+                                <div class="text-muted fs-11 mt-1" id="todayCheckOutAddress">
+                                    @if (! empty($todayStatus['check_out_address']))
+                                        {{ $todayStatus['check_out_address'] }}
+                                    @elseif (! empty($todayStatus['check_out_latitude']))
+                                        {{ number_format((float) $todayStatus['check_out_latitude'], 6) }}, {{ number_format((float) $todayStatus['check_out_longitude'], 6) }}
+                                    @else
+                                        —
+                                    @endif
+                                </div>
                             </div>
                         </div>
                         <p class="text-muted fs-12" id="employeeGpsStatus">Enable location permission for high-accuracy GPS.</p>
@@ -51,7 +69,7 @@
                         <div class="card-title mb-0">Today's location</div>
                     </div>
                     <div class="card-body p-0">
-                        <div id="employeeTodayMap" style="height: 280px; border-radius: 0 0 8px 8px;"></div>
+                        <div id="employeeTodayMap" style="height: 400px; border-radius: 0 0 8px 8px;"></div>
                     </div>
                 </div>
             </div>
@@ -130,8 +148,8 @@
                             <th>Status</th>
                             <th>Check-in</th>
                             <th>Check-out</th>
-                            <th>Check-in GPS</th>
-                            <th>Check-out GPS</th>
+                            <th>Check-in location</th>
+                            <th>Check-out location</th>
                             <th>Source</th>
                             <th>Recorded</th>
                         </tr>
@@ -164,6 +182,7 @@
         <script src="{{ asset('libs/datatables.net-bs5/js/dataTables.bootstrap5.min.js') }}"></script>
         @can('hr.attendance.self_mark')
             <script src="{{ asset('libs/leaflet/leaflet.js') }}"></script>
+            <script src="{{ asset('js/modules/shared/attendance-location.js') }}"></script>
             <script src="{{ asset('js/modules/employee/geolocation-capture.js') }}"></script>
             <script src="{{ asset('js/modules/employee/attendance-check.js') }}"></script>
         @endcan

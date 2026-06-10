@@ -8,6 +8,7 @@ use App\Models\LeaveApplication;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class EmployeePortalTest extends TestCase
@@ -177,6 +178,12 @@ class EmployeePortalTest extends TestCase
 
     public function test_employee_can_check_in_with_gps_payload(): void
     {
+        Http::fake([
+            'nominatim.openstreetmap.org/*' => Http::response([
+                'display_name' => 'Law Garden, Ellisbridge, Ahmedabad, Gujarat 380006, India',
+            ], 200),
+        ]);
+
         [$user, $employee] = $this->linkedEmployeeUser();
 
         $this->actingAs($user)
@@ -188,12 +195,17 @@ class EmployeePortalTest extends TestCase
                 'captured_at' => now()->toIso8601String(),
             ])
             ->assertCreated()
-            ->assertJsonPath('status', true);
+            ->assertJsonPath('status', true)
+            ->assertJsonPath(
+                'data.check_in_address',
+                'Law Garden, Ellisbridge, Ahmedabad, Gujarat 380006, India'
+            );
 
         $this->assertDatabaseHas('attendance_entries', [
             'employee_id' => $employee->id,
             'status' => 'present',
             'source' => 'self_service',
+            'check_in_address' => 'Law Garden, Ellisbridge, Ahmedabad, Gujarat 380006, India',
         ]);
 
         $entry = AttendanceEntry::query()->where('employee_id', $employee->id)->first();
@@ -238,6 +250,7 @@ class EmployeePortalTest extends TestCase
             'check_in_latitude' => '23.02251234',
             'check_in_longitude' => '72.57136278',
             'check_in_accuracy_m' => '5.000',
+            'check_in_address' => 'Law Garden, Ellisbridge, Ahmedabad, Gujarat, India',
         ]);
 
         $response = $this->actingAs($hr)
@@ -246,6 +259,8 @@ class EmployeePortalTest extends TestCase
             ]);
 
         $response->assertOk();
-        $this->assertGreaterThanOrEqual(1, count($response->json('data.markers')));
+        $markers = $response->json('data.markers');
+        $this->assertGreaterThanOrEqual(1, count($markers));
+        $this->assertSame('Law Garden, Ellisbridge, Ahmedabad, Gujarat, India', $markers[0]['address']);
     }
 }

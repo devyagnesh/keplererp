@@ -100,8 +100,8 @@ class AttendanceController extends Controller
                 'source' => $row->source,
                 'check_in' => $row->check_in_at?->format('H:i:s') ?? '—',
                 'check_out' => $row->check_out_at?->format('H:i:s') ?? '—',
-                'check_in_location' => $this->formatCoordinates($row->check_in_latitude, $row->check_in_longitude, $row->check_in_accuracy_m),
-                'check_out_location' => $this->formatCoordinates($row->check_out_latitude, $row->check_out_longitude, $row->check_out_accuracy_m),
+                'check_in_location' => $row->checkInLocationLabel(),
+                'check_out_location' => $row->checkOutLocationLabel(),
                 'created_at' => $row->created_at?->format('Y-m-d H:i'),
             ];
         })->values()->all();
@@ -155,6 +155,8 @@ class AttendanceController extends Controller
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'accuracy_m' => $entry->check_in_accuracy_m !== null ? (float) $entry->check_in_accuracy_m : null,
+                    'address' => $entry->check_in_address,
+                    'map_url' => $entry->checkInMapUrl(),
                     'recorded_at' => $entry->check_in_at?->format('Y-m-d H:i:s'),
                 ];
                 $latSum += $lat;
@@ -172,6 +174,8 @@ class AttendanceController extends Controller
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'accuracy_m' => $entry->check_out_accuracy_m !== null ? (float) $entry->check_out_accuracy_m : null,
+                    'address' => $entry->check_out_address,
+                    'map_url' => $entry->checkOutMapUrl(),
                     'recorded_at' => $entry->check_out_at?->format('Y-m-d H:i:s'),
                 ];
                 $latSum += $lat;
@@ -223,19 +227,5 @@ class AttendanceController extends Controller
                 'message' => 'Could not save attendance.',
             ], 500);
         }
-    }
-
-    private function formatCoordinates(?string $lat, ?string $lng, ?string $accuracy): string
-    {
-        if ($lat === null || $lng === null) {
-            return '—';
-        }
-
-        $label = sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
-        if ($accuracy !== null) {
-            $label .= sprintf(' (±%.0fm)', (float) $accuracy);
-        }
-
-        return $label;
     }
 }

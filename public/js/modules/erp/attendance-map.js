@@ -7,13 +7,41 @@ $(function () {
         return;
     }
 
-    var map = L.map('attendanceMap').setView([20.5937, 78.9629], 5);
+    var locationHelper = window.AttendanceLocation || null;
+    var map = L.map('attendanceMap', { scrollWheelZoom: true }).setView([20.5937, 78.9629], 5);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '© OpenStreetMap',
+        attribution: '© OpenStreetMap contributors',
     }).addTo(map);
 
     var markerLayer = L.layerGroup().addTo(map);
+
+    setTimeout(function () {
+        map.invalidateSize();
+    }, 200);
+
+    /**
+     * Build popup content for a map marker.
+     * @param {object} item
+     * @returns {string}
+     */
+    function buildPopup(item) {
+        if (locationHelper) {
+            return locationHelper.buildPopup({
+                employee: item.employee,
+                type: item.type,
+                latitude: item.latitude,
+                longitude: item.longitude,
+                accuracy_m: item.accuracy_m,
+                address: item.address,
+                map_url: item.map_url,
+                recorded_at: item.recorded_at,
+            });
+        }
+
+        return item.employee + '<br>' + item.latitude.toFixed(6) + ', ' + item.longitude.toFixed(6);
+    }
 
     /**
      * Load markers from server using current filter values.
@@ -51,36 +79,26 @@ $(function () {
                     var lng = item.longitude;
                     var isIn = item.type === 'check_in';
                     var color = isIn ? '#28a745' : '#dc3545';
-                    var label = isIn ? 'Check-in' : 'Check-out';
-                    var popup =
-                        '<strong>' +
-                        item.employee +
-                        '</strong><br>' +
-                        label +
-                        '<br>' +
-                        lat.toFixed(6) +
-                        ', ' +
-                        lng.toFixed(6) +
-                        (item.accuracy_m ? '<br>±' + Math.round(item.accuracy_m) + ' m' : '') +
-                        (item.recorded_at ? '<br>' + item.recorded_at : '');
+                    var popup = buildPopup(item);
 
                     L.circleMarker([lat, lng], {
-                        radius: 8,
+                        radius: 9,
                         color: color,
                         fillColor: color,
-                        fillOpacity: 0.85,
+                        fillOpacity: 0.9,
+                        weight: 2,
                     })
-                        .bindPopup(popup)
+                        .bindPopup(popup, { maxWidth: 320 })
                         .addTo(markerLayer);
 
                     if (item.accuracy_m) {
                         L.circle([lat, lng], {
                             radius: item.accuracy_m,
                             color: color,
-                            fillOpacity: 0.08,
+                            fillOpacity: 0.1,
                             weight: 1,
                         })
-                            .bindPopup(popup)
+                            .bindPopup(popup, { maxWidth: 320 })
                             .addTo(markerLayer);
                     }
 
@@ -88,10 +106,14 @@ $(function () {
                 });
 
                 if (bounds.length === 1) {
-                    map.setView(bounds[0], 16);
+                    map.setView(bounds[0], 18);
                 } else {
-                    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+                    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
                 }
+
+                setTimeout(function () {
+                    map.invalidateSize();
+                }, 100);
             },
             error: function () {
                 notifyError('Could not load attendance map data.');

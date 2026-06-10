@@ -176,6 +176,8 @@ class EmployeeAttendanceController extends Controller
                     'check_out_longitude',
                     'check_in_accuracy_m',
                     'check_out_accuracy_m',
+                    'check_in_address',
+                    'check_out_address',
                     'source',
                 ]);
             }
@@ -217,8 +219,8 @@ class EmployeeAttendanceController extends Controller
                     'status' => $row->status,
                     'check_in' => $row->check_in_at?->format('H:i:s') ?? '—',
                     'check_out' => $row->check_out_at?->format('H:i:s') ?? '—',
-                    'check_in_location' => $this->formatCoordinates($row->check_in_latitude, $row->check_in_longitude, $row->check_in_accuracy_m),
-                    'check_out_location' => $this->formatCoordinates($row->check_out_latitude, $row->check_out_longitude, $row->check_out_accuracy_m),
+                    'check_in_location' => $row->checkInLocationLabel(),
+                    'check_out_location' => $row->checkOutLocationLabel(),
                     'source' => $row->source ?? '—',
                     'created_at' => $row->created_at?->format('Y-m-d H:i'),
                 ];
@@ -241,19 +243,5 @@ class EmployeeAttendanceController extends Controller
                 'error' => 'Could not load attendance records.',
             ], 500);
         }
-    }
-
-    private function formatCoordinates(?string $lat, ?string $lng, ?string $accuracy): string
-    {
-        if ($lat === null || $lng === null) {
-            return '—';
-        }
-
-        $label = sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
-        if ($accuracy !== null) {
-            $label .= sprintf(' (±%.0fm)', (float) $accuracy);
-        }
-
-        return $label;
     }
 }

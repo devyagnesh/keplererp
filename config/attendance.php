@@ -19,4 +19,13 @@ return [
     */
     'max_capture_age_seconds' => (int) env('ATTENDANCE_MAX_CAPTURE_AGE_SECONDS', 120),
 
+    /*
+    | Reverse geocoding (OpenStreetMap Nominatim) for full street addresses on check-in/out.
+    */
+    'geocoding_enabled' => filter_var(env('ATTENDANCE_GEOCODING_ENABLED', true), FILTER_VALIDATE_BOOL),
+
+    'nominatim_url' => env('ATTENDANCE_NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
+
+    'geocoding_user_agent' => env('ATTENDANCE_GEOCODING_USER_AGENT', 'ManufactureERP/1.0 (HR attendance)'),
+
 ];

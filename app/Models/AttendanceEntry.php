@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $check_out_longitude
  * @property string|null $check_in_accuracy_m
  * @property string|null $check_out_accuracy_m
+ * @property string|null $check_in_address
+ * @property string|null $check_out_address
  * @property string|null $check_in_altitude_m
  * @property string|null $check_out_altitude_m
  * @property array<string, mixed>|null $check_in_meta
@@ -47,6 +49,8 @@ class AttendanceEntry extends Model
         'check_out_longitude',
         'check_in_accuracy_m',
         'check_out_accuracy_m',
+        'check_in_address',
+        'check_out_address',
         'check_in_altitude_m',
         'check_out_altitude_m',
         'check_in_meta',
@@ -101,5 +105,73 @@ class AttendanceEntry extends Model
     public function hasCheckOutCoordinates(): bool
     {
         return $this->check_out_latitude !== null && $this->check_out_longitude !== null;
+    }
+
+    public function checkInLocationLabel(): string
+    {
+        return $this->locationLabel(
+            $this->check_in_address,
+            $this->check_in_latitude,
+            $this->check_in_longitude,
+            $this->check_in_accuracy_m
+        );
+    }
+
+    public function checkOutLocationLabel(): string
+    {
+        return $this->locationLabel(
+            $this->check_out_address,
+            $this->check_out_latitude,
+            $this->check_out_longitude,
+            $this->check_out_accuracy_m
+        );
+    }
+
+    public function checkInMapUrl(): ?string
+    {
+        return $this->mapUrl($this->check_in_latitude, $this->check_in_longitude);
+    }
+
+    public function checkOutMapUrl(): ?string
+    {
+        return $this->mapUrl($this->check_out_latitude, $this->check_out_longitude);
+    }
+
+    private function locationLabel(?string $address, ?string $lat, ?string $lng, ?string $accuracy): string
+    {
+        if ($address !== null && $address !== '') {
+            $label = $address;
+            if ($accuracy !== null) {
+                $label .= sprintf(' (±%.0fm GPS)', (float) $accuracy);
+            }
+
+            return $label;
+        }
+
+        if ($lat === null || $lng === null) {
+            return '—';
+        }
+
+        $label = sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
+        if ($accuracy !== null) {
+            $label .= sprintf(' (±%.0fm)', (float) $accuracy);
+        }
+
+        return $label;
+    }
+
+    private function mapUrl(?string $lat, ?string $lng): ?string
+    {
+        if ($lat === null || $lng === null) {
+            return null;
+        }
+
+        return sprintf(
+            'https://www.openstreetmap.org/?mlat=%s&mlon=%s#map=18/%s/%s',
+            $lat,
+            $lng,
+            $lat,
+            $lng
+        );
     }
 }

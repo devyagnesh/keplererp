@@ -97,7 +97,7 @@
                         </div>
                     </div>
                     <div id="attendanceMap" style="height: 420px; border-radius: 8px;"></div>
-                    <p class="text-muted fs-12 mt-2 mb-0">Green = check-in, red = check-out. Circles show GPS accuracy radius in metres.</p>
+                    <p class="text-muted fs-12 mt-2 mb-0">Green = check-in, red = check-out. Popups show full street address when available. Circles show GPS accuracy radius in metres.</p>
                 </div>
             </div>
         </div>
@@ -119,8 +119,8 @@
                                     <th>Source</th>
                                     <th>Check-in</th>
                                     <th>Check-out</th>
-                                    <th>Check-in GPS</th>
-                                    <th>Check-out GPS</th>
+                                    <th>Check-in location</th>
+                                    <th>Check-out location</th>
                                     <th>Logged</th>
                                 </tr>
                             </thead>
@@ -149,6 +149,7 @@
         <script src="{{ asset('vendor/datatables/jquery.dataTables.min.js') }}"></script>
         <script src="{{ asset('libs/datatables.net-bs5/js/dataTables.bootstrap5.min.js') }}"></script>
         <script src="{{ asset('libs/leaflet/leaflet.js') }}"></script>
+        <script src="{{ asset('js/modules/shared/attendance-location.js') }}"></script>
         <script src="{{ asset('js/modules/erp/attendance-index.js') }}"></script>
         <script src="{{ asset('js/modules/erp/attendance-map.js') }}"></script>
         <script src="{{ asset('js/modules/erp/attendance-mark-form.js') }}"></script>
