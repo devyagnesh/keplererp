@@ -573,6 +573,9 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/hr/attendance/data', [AttendanceController::class, 'data'])
             ->middleware('throttle:120,1')
             ->name('admin.hr.attendance.data');
+        Route::post('/admin/hr/attendance/map-data', [AttendanceController::class, 'mapData'])
+            ->middleware('throttle:120,1')
+            ->name('admin.hr.attendance.map-data');
         Route::post('/admin/hr/attendance', [AttendanceController::class, 'store'])->name('admin.hr.attendance.store');
     });
 
@@ -594,9 +597,16 @@ Route::middleware('auth')->group(function (): void {
             ->name('admin.hr.payroll-details.pdf');
     });
 
-    Route::middleware(['auth', 'permission:hr.payslip.view|hr.attendance.view|hr.leave.apply'])->prefix('employee')->name('employee.')->group(function (): void {
+    Route::middleware(['auth', 'permission:hr.payslip.view|hr.attendance.view|hr.leave.apply|hr.attendance.self_mark'])->prefix('employee')->name('employee.')->group(function (): void {
         Route::get('/', [EmployeeDashboardController::class, 'index'])->name('dashboard');
         Route::get('/attendance', [EmployeeAttendanceController::class, 'index'])->name('attendance.index');
+        Route::get('/attendance/today-status', [EmployeeAttendanceController::class, 'todayStatus'])->name('attendance.today-status');
+        Route::post('/attendance/check-in', [EmployeeAttendanceController::class, 'checkIn'])
+            ->middleware('throttle:30,1')
+            ->name('attendance.check-in');
+        Route::post('/attendance/check-out', [EmployeeAttendanceController::class, 'checkOut'])
+            ->middleware('throttle:30,1')
+            ->name('attendance.check-out');
         Route::post('/attendance/data', [EmployeeAttendanceController::class, 'data'])
             ->middleware('throttle:120,1')
             ->name('attendance.data');

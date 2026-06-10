@@ -2,16 +2,16 @@
 
 namespace App\Services;
 
+use App\Enums\PdfDocumentType;
 use App\Models\AttendanceEntry;
 use App\Models\Employee;
 use App\Models\PayrollDetail;
 use App\Models\PayrollRun;
 use App\Models\PayrollSetting;
 use App\Models\User;
-use Carbon\Carbon;
-use App\Enums\PdfDocumentType;
 use App\Services\Pdf\PdfGeneratorService;
 use App\Services\WhatsApp\WhatsAppNotificationService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Throwable;
@@ -142,7 +142,7 @@ class PayrollRunService
         $presentDays = AttendanceEntry::query()
             ->where('employee_id', $employee->id)
             ->whereBetween('work_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
-            ->whereIn('status', ['present', 'half_day'])
+            ->whereIn('status', ['present', 'half', 'half_day'])
             ->count();
 
         $lopDays = AttendanceEntry::query()

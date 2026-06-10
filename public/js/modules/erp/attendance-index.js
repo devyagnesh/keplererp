@@ -1,5 +1,5 @@
 /**
- * Attendance listing DataTable with work date filter.
+ * HR attendance listing with filters and extended GPS columns.
  */
 $(function () {
     var $table = $('#attendanceTable');
@@ -8,8 +8,19 @@ $(function () {
     }
 
     function currentWorkDate() {
-        var v = $('#attendanceFilterDate').val();
-        return v || window.attendanceWorkDate;
+        return $('#attendanceFilterDate').val() || window.attendanceWorkDate;
+    }
+
+    function filterEmployeeId() {
+        return $('#attendanceFilterEmployee').val() || '';
+    }
+
+    function filterStatus() {
+        return $('#attendanceFilterStatus').val() || '';
+    }
+
+    function filterSource() {
+        return $('#attendanceFilterSource').val() || '';
     }
 
     var table = $table.DataTable({
@@ -23,6 +34,9 @@ $(function () {
             },
             data: function (d) {
                 d.work_date = currentWorkDate();
+                d.employee_id = filterEmployeeId();
+                d.status = filterStatus();
+                d.source = filterSource();
             },
         },
         columns: [
@@ -30,9 +44,14 @@ $(function () {
             { data: 'emp_code', name: 'emp_code', orderable: false },
             { data: 'work_date', name: 'work_date' },
             { data: 'status', name: 'status', orderable: false },
+            { data: 'source', name: 'source', orderable: false },
+            { data: 'check_in', name: 'check_in', orderable: false },
+            { data: 'check_out', name: 'check_out', orderable: false },
+            { data: 'check_in_location', name: 'check_in_location', orderable: false },
+            { data: 'check_out_location', name: 'check_out_location', orderable: false },
             { data: 'created_at', name: 'created_at' },
         ],
-        order: [[4, 'desc']],
+        order: [[9, 'desc']],
         pageLength: 25,
         language: {
             processing: '<span class="spinner-border spinner-border-sm"></span> Loading...',
@@ -41,7 +60,13 @@ $(function () {
         },
     });
 
-    $('#attendanceFilterDate').on('change', function () {
-        table.ajax.reload();
-    });
+    $('#attendanceFilterDate, #attendanceFilterEmployee, #attendanceFilterStatus, #attendanceFilterSource').on(
+        'change',
+        function () {
+            table.ajax.reload();
+            if (typeof window.reloadAttendanceMap === 'function') {
+                window.reloadAttendanceMap();
+            }
+        }
+    );
 });

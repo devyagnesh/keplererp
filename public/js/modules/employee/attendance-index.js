@@ -1,5 +1,5 @@
 /**
- * Employee attendance history DataTable with month filter.
+ * Employee attendance history DataTable with month and status filters.
  */
 $(function () {
     var $table = $('#employeeAttendanceTable');
@@ -8,8 +8,11 @@ $(function () {
     }
 
     function currentMonth() {
-        var v = $('#attendanceMonth').val();
-        return v || window.employeeAttendanceMonth;
+        return $('#attendanceMonth').val() || window.employeeAttendanceMonth;
+    }
+
+    function currentStatus() {
+        return $('#attendanceStatusFilter').val() || '';
     }
 
     function statusBadge(status) {
@@ -35,6 +38,7 @@ $(function () {
             },
             data: function (d) {
                 d.month = currentMonth();
+                d.status = currentStatus();
             },
         },
         columns: [
@@ -47,21 +51,39 @@ $(function () {
                     return statusBadge(data);
                 },
             },
+            { data: 'check_in', name: 'check_in', orderable: false },
+            { data: 'check_out', name: 'check_out', orderable: false },
+            { data: 'check_in_location', name: 'check_in_location', orderable: false },
+            { data: 'check_out_location', name: 'check_out_location', orderable: false },
+            { data: 'source', name: 'source', orderable: false },
             { data: 'created_at', name: 'created_at' },
         ],
         order: [[0, 'desc']],
         pageLength: 25,
         language: {
             processing: '<span class="spinner-border spinner-border-sm"></span> Loading...',
-            emptyTable: 'No attendance for this month.',
+            emptyTable: 'No attendance for this period.',
             zeroRecords: 'No matching records found.',
         },
     });
 
-    $('#attendanceMonth').on('change', function () {
-        var month = $(this).val();
+    $('#attendanceMonth, #attendanceStatusFilter').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#attendanceFilterApply').on('click', function () {
+        var month = $('#attendanceMonth').val();
+        var status = $('#attendanceStatusFilter').val();
+        var params = new URLSearchParams(window.location.search);
         if (month) {
-            window.location.href = window.location.pathname + '?month=' + encodeURIComponent(month);
+            params.set('month', month);
         }
+        if (status) {
+            params.set('status', status);
+        } else {
+            params.delete('status');
+        }
+        window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+        table.ajax.reload();
     });
 });

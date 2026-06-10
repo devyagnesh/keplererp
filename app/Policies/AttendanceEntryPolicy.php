@@ -30,6 +30,11 @@ class AttendanceEntryPolicy
         return $user->can('hr.attendance.mark');
     }
 
+    public function selfMark(User $user): bool
+    {
+        return $user->can('hr.attendance.self_mark');
+    }
+
     public function update(User $user, AttendanceEntry $attendanceEntry): bool
     {
         return $user->can('hr.attendance.mark');

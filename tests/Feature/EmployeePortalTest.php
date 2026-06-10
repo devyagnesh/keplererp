@@ -174,4 +174,78 @@ class EmployeePortalTest extends TestCase
         $response->assertOk();
         $this->assertSame(1, (int) $response->json('recordsTotal'));
     }
+
+    public function test_employee_can_check_in_with_gps_payload(): void
+    {
+        [$user, $employee] = $this->linkedEmployeeUser();
+
+        $this->actingAs($user)
+            ->postJson(route('employee.attendance.check-in'), [
+                'latitude' => 23.02251234,
+                'longitude' => 72.57136278,
+                'accuracy_m' => 8.5,
+                'altitude_m' => 45.2,
+                'captured_at' => now()->toIso8601String(),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('status', true);
+
+        $this->assertDatabaseHas('attendance_entries', [
+            'employee_id' => $employee->id,
+            'status' => 'present',
+            'source' => 'self_service',
+        ]);
+
+        $entry = AttendanceEntry::query()->where('employee_id', $employee->id)->first();
+        $this->assertNotNull($entry?->check_in_at);
+        $this->assertSame('23.02251234', (string) $entry->check_in_latitude);
+    }
+
+    public function test_employee_cannot_check_in_twice_same_day(): void
+    {
+        [$user, $employee] = $this->linkedEmployeeUser();
+
+        $payload = [
+            'latitude' => 23.02251234,
+            'longitude' => 72.57136278,
+            'accuracy_m' => 8.5,
+            'captured_at' => now()->toIso8601String(),
+        ];
+
+        $this->actingAs($user)->postJson(route('employee.attendance.check-in'), $payload)->assertCreated();
+        $this->actingAs($user)->postJson(route('employee.attendance.check-in'), $payload)->assertStatus(422);
+    }
+
+    public function test_hr_attendance_map_returns_gps_markers(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $hr = User::factory()->create();
+        $hr->assignRole('HR Manager');
+
+        $employee = Employee::query()->create([
+            'emp_code' => 'EMP-MAP',
+            'name' => 'Map Test',
+            'is_active' => true,
+            'basic_salary' => '10000',
+        ]);
+
+        AttendanceEntry::query()->create([
+            'employee_id' => $employee->id,
+            'work_date' => now()->toDateString(),
+            'status' => 'present',
+            'source' => 'self_service',
+            'check_in_at' => now(),
+            'check_in_latitude' => '23.02251234',
+            'check_in_longitude' => '72.57136278',
+            'check_in_accuracy_m' => '5.000',
+        ]);
+
+        $response = $this->actingAs($hr)
+            ->postJson(route('admin.hr.attendance.map-data'), [
+                'work_date' => now()->toDateString(),
+            ]);
+
+        $response->assertOk();
+        $this->assertGreaterThanOrEqual(1, count($response->json('data.markers')));
+    }
 }

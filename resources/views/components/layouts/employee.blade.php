@@ -113,7 +113,6 @@
                                 </a>
                             </li>
                         @endcan
-                        @can('hr.leave.apply')
                             <li class="slide">
                                 <a href="{{ route('employee.leave.index') }}"
                                     class="side-menu__item {{ request()->routeIs('employee.leave.*') ? 'active' : '' }}">
