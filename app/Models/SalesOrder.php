@@ -7,19 +7,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $order_number
  * @property int $customer_id
- * @property \Illuminate\Support\Carbon $order_date
+ * @property Carbon $order_date
  * @property string $status
- * @property \Illuminate\Support\Carbon|null $dispatched_at
+ * @property Carbon|null $dispatched_at
  * @property int|null $created_by
  * @property string|null $notes
  * @property int|null $quotation_id
  * @property int|null $warehouse_id
- * @property \Illuminate\Support\Carbon|null $expected_dispatch
+ * @property Carbon|null $expected_dispatch
  * @property int $payment_terms_days
  * @property string $subtotal
  * @property string $discount_amount
@@ -60,6 +61,8 @@ class SalesOrder extends Model
         'tracking_number',
         'transporter_name',
         'processing_at',
+        'pick_confirmed_at',
+        'packaging_notes',
     ];
 
     /**
@@ -71,6 +74,7 @@ class SalesOrder extends Model
             'order_date' => 'date',
             'dispatched_at' => 'datetime',
             'processing_at' => 'datetime',
+            'pick_confirmed_at' => 'datetime',
             'expected_dispatch' => 'date',
             'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2',

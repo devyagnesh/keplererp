@@ -14,6 +14,13 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.hr.payroll-runs.pdf', $run) }}" class="btn btn-outline-secondary btn-wave" target="_blank" rel="noopener">Summary PDF</a>
+            @if ($run->status === 'processed')
+                <a href="{{ route('admin.hr.payroll-runs.bank-export', $run) }}" class="btn btn-outline-primary btn-wave">Bank CSV</a>
+                <a href="{{ route('admin.hr.payroll-runs.pf-ecr', $run) }}" class="btn btn-outline-primary btn-wave">PF ECR</a>
+                <a href="{{ route('admin.hr.payroll-runs.esi-export', $run) }}" class="btn btn-outline-primary btn-wave">ESI</a>
+                <a href="{{ route('admin.hr.payroll-runs.pt-export', $run) }}" class="btn btn-outline-primary btn-wave">PT</a>
+                <button type="button" class="btn btn-success btn-wave js-payroll-mark-paid" data-url="{{ route('admin.hr.payroll-runs.mark-paid', $run) }}">Mark PAID</button>
+            @endif
             <a href="{{ route('admin.hr.payroll-runs.index') }}" class="btn btn-light btn-wave">Back</a>
         </div>
     </div>
@@ -51,4 +58,19 @@
             </div>
         </div>
     </div>
+    @if ($run->status === 'processed')
+        @push('scripts')
+            <script>
+                $(function () {
+                    $('.js-payroll-mark-paid').on('click', function () {
+                        var url = $(this).data('url');
+                        if (!confirm('Mark all payslips in this run as PAID?')) { return; }
+                        $.post(url, { _token: $('meta[name="csrf-token"]').attr('content') })
+                            .done(function (r) { notifySuccess(r.message); window.location.reload(); })
+                            .fail(function (x) { notifyError(x.responseJSON?.message || 'Failed'); });
+                    });
+                });
+            </script>
+        @endpush
+    @endif
 </x-layouts.app>

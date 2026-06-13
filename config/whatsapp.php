@@ -64,5 +64,9 @@ return [
         'prod_started' => 'prod_started',
         'prod_complete' => 'prod_complete',
         'salary_credited' => 'salary_credited',
+        'vendor_portal' => 'vendor_portal',
+        'po_vendor_accepted' => 'po_vendor_accepted',
+        'quotation_sent' => 'quotation_sent',
+        'employee_portal' => 'employee_portal',
     ],
 ];

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Supplier / vendor master (purchase module).
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $payment_terms
  * @property string|null $notes
  * @property VendorStatus $status
- * @property \Illuminate\Support\Carbon|null $approved_at
+ * @property Carbon|null $approved_at
  * @property int|null $approved_by
  * @property int|null $created_by
  */
@@ -61,6 +62,8 @@ class Vendor extends Model implements AuthenticatableContract
         'status',
         'portal_enabled',
         'portal_password',
+        'portal_must_change_password',
+        'portal_password_changed_at',
         'approved_at',
         'approved_by',
         'created_by',
@@ -82,6 +85,8 @@ class Vendor extends Model implements AuthenticatableContract
             'approved_at' => 'datetime',
             'portal_enabled' => 'boolean',
             'portal_password' => 'hashed',
+            'portal_must_change_password' => 'boolean',
+            'portal_password_changed_at' => 'datetime',
             'credit_limit' => 'decimal:2',
             'rating' => 'decimal:2',
         ];

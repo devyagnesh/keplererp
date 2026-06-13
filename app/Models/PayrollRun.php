@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $period_month
  * @property string $status
  * @property int|null $processed_by
- * @property \Illuminate\Support\Carbon|null $processed_at
+ * @property Carbon|null $processed_at
  */
 class PayrollRun extends Model
 {
@@ -23,8 +24,12 @@ class PayrollRun extends Model
         'period_year',
         'period_month',
         'status',
+        'attendance_locked',
         'processed_by',
         'processed_at',
+        'approved_by',
+        'approved_at',
+        'paid_at',
     ];
 
     /**
@@ -33,7 +38,10 @@ class PayrollRun extends Model
     protected function casts(): array
     {
         return [
+            'attendance_locked' => 'boolean',
             'processed_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 

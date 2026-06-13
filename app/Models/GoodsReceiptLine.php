@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $rejected_qty
  * @property string|null $batch_no
  * @property string|null $serial_no
- * @property \Illuminate\Support\Carbon|null $expiry_date
+ * @property Carbon|null $expiry_date
  */
 class GoodsReceiptLine extends Model
 {
@@ -27,6 +28,8 @@ class GoodsReceiptLine extends Model
         'quantity',
         'accepted_qty',
         'rejected_qty',
+        'qc_status',
+        'qc_remarks',
         'batch_no',
         'serial_no',
         'expiry_date',

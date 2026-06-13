@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\BillOfMaterial;
 use App\Models\InventoryBalance;
-use App\Models\Item;
 use App\Models\ProductionOrder;
 use App\Models\SalesOrder;
 use App\Models\User;
@@ -52,13 +51,23 @@ class ProductionSuggestService
                     continue;
                 }
 
+                $batchYield = bcadd((string) ($bom->batch_yield_qty ?? '1'), '0', 4);
+                if (bccomp($batchYield, '0', 4) <= 0) {
+                    $batchYield = '1.0000';
+                }
+                $batches = bcdiv($need, $batchYield, 0);
+                if (bccomp(bcmul($batches, $batchYield, 4), $need, 4) < 0) {
+                    $batches = bcadd($batches, '1', 0);
+                }
+                $plannedQty = bcmul($batches, $batchYield, 4);
+
                 $wo = ProductionOrder::query()->create([
                     'wo_number' => $this->documentNumbers->next('production_orders', 'WO-'),
                     'item_id' => $item->id,
                     'bom_id' => $bom->id,
                     'warehouse_id' => $salesOrder->warehouse_id,
                     'sales_order_id' => $salesOrder->id,
-                    'qty_planned' => $need,
+                    'qty_planned' => $plannedQty,
                     'status' => 'planned',
                     'created_by' => $user->id,
                     'notes' => 'Auto-suggested from SO '.$salesOrder->order_number,

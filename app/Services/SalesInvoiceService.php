@@ -2,15 +2,17 @@
 
 namespace App\Services;
 
+use App\Enums\PdfDocumentType;
+use App\Mail\InvoicePostedMail;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\SalesOrder;
 use App\Models\User;
-use App\Enums\PdfDocumentType;
 use App\Services\Pdf\PdfGeneratorService;
 use App\Services\WhatsApp\WhatsAppNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 use Throwable;
 
@@ -110,11 +112,12 @@ class SalesInvoiceService
 
         $invoice->loadMissing('customer');
         $postedCustomer = $invoice->customer;
+        $document = $this->pdfGenerator->generate(PdfDocumentType::TaxInvoice, $invoice, $user->id);
         if ($postedCustomer instanceof Customer) {
             $this->whatsappNotifications->notifyInvoicePosted($invoice, $postedCustomer);
             if ($postedCustomer->email !== null && $postedCustomer->email !== '') {
-                \Illuminate\Support\Facades\Mail::to($postedCustomer->email)->queue(
-                    new \App\Mail\InvoicePostedMail($invoice)
+                Mail::to($postedCustomer->email)->queue(
+                    new InvoicePostedMail($invoice, $document)
                 );
             }
         }
@@ -125,8 +128,6 @@ class SalesInvoiceService
             $invoice,
             $user
         );
-
-        $this->pdfGenerator->queue(PdfDocumentType::TaxInvoice, $invoice, $user->id);
 
         return $invoice;
     }

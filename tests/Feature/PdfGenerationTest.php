@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Enums\PdfDocumentType;
-use App\Jobs\GenerateDocumentPdfJob;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Employee;
@@ -14,20 +13,22 @@ use App\Models\PayrollRun;
 use App\Models\SalesOrder;
 use App\Models\User;
 use App\Services\Pdf\PdfGeneratorService;
+use App\Support\NumberToWords;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Tests\Concerns\ProcessesPayrollRuns;
 use Tests\TestCase;
 
 class PdfGenerationTest extends TestCase
 {
+    use ProcessesPayrollRuns;
     use RefreshDatabase;
 
-    public function test_invoice_post_queues_tax_invoice_pdf_job(): void
+    public function test_invoice_post_generates_tax_invoice_pdf(): void
     {
-        Queue::fake();
+        Storage::fake('local');
         $this->seed(RolePermissionSeeder::class);
         $user = User::factory()->create();
         $user->assignRole('Super Admin');
@@ -50,9 +51,16 @@ class PdfGenerationTest extends TestCase
 
         $this->actingAs($user)->postJson(route('admin.sales.orders.invoice', $order))->assertOk();
 
-        Queue::assertPushed(GenerateDocumentPdfJob::class, function (GenerateDocumentPdfJob $job): bool {
-            return $job->type === PdfDocumentType::TaxInvoice;
-        });
+        $invoice = Invoice::query()->where('sales_order_id', $order->id)->first();
+        $this->assertNotNull($invoice);
+
+        $document = GeneratedDocument::query()
+            ->where('document_type', PdfDocumentType::TaxInvoice)
+            ->where('documentable_type', Invoice::class)
+            ->where('documentable_id', $invoice->id)
+            ->first();
+        $this->assertNotNull($document);
+        Storage::disk('local')->assertExists($document->file_path);
     }
 
     public function test_pdf_generator_stores_document_and_signed_url_works(): void
@@ -112,7 +120,7 @@ class PdfGenerationTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
     }
 
-    public function test_payroll_process_generates_payslip_pdfs(): void
+    public function test_payroll_approve_generates_payslip_pdfs(): void
     {
         Storage::fake('local');
         $this->seed(RolePermissionSeeder::class);
@@ -137,10 +145,13 @@ class PdfGenerationTest extends TestCase
             'created_by' => $user->id,
         ]);
 
-        $this->actingAs($user)->postJson(route('admin.hr.payroll-runs.process', $run))->assertOk();
-
+        $this->lockAndProcessPayroll($run, $user);
         $run->refresh();
         $this->assertSame('processed', $run->status);
+
+        $this->approvePayroll($run, $user);
+        $run->refresh();
+        $this->assertSame('approved', $run->status);
 
         $detail = PayrollDetail::query()->where('payroll_run_id', $run->id)->first();
         $this->assertNotNull($detail);
@@ -165,7 +176,7 @@ class PdfGenerationTest extends TestCase
     {
         $this->assertSame(
             'Rupees Five Hundred Ninety Only',
-            \App\Support\NumberToWords::rupees('590.00')
+            NumberToWords::rupees('590.00')
         );
     }
 

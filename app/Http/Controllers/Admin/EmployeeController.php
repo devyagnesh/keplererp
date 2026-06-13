@@ -6,11 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\AllowanceType;
+use App\Models\Department;
+use App\Models\Designation;
 use App\Models\Employee;
-use App\Services\PayrollCalculationService;
-use Illuminate\Foundation\Http\FormRequest;
 use App\Models\User;
+use App\Services\EmployeeProvisioningService;
+use App\Services\LeaveBalanceService;
+use App\Services\Payroll\PayrollArrearService;
+use App\Services\PayrollCalculationService;
 use App\Support\ErpDataTable;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +25,10 @@ use Throwable;
 class EmployeeController extends Controller
 {
     public function __construct(
-        protected PayrollCalculationService $payrollCalc
+        protected PayrollCalculationService $payrollCalc,
+        protected LeaveBalanceService $leaveBalances,
+        protected PayrollArrearService $arrears,
+        protected EmployeeProvisioningService $provisioning
     ) {}
 
     public function index(): View
@@ -101,6 +109,11 @@ class EmployeeController extends Controller
             unset($data['allowances']);
             $employee = Employee::query()->create($data);
             $this->payrollCalc->syncEmployeeAllowances($employee, $allowances);
+            $this->leaveBalances->initializeForEmployee($employee);
+            $this->arrears->queueForNewEmployee($employee);
+            if ($request->boolean('create_login')) {
+                $this->provisioning->createLoginForEmployee($employee, $data['email'] ?? null);
+            }
 
             return response()->json([
                 'status' => true,
@@ -177,8 +190,8 @@ class EmployeeController extends Controller
     protected function employeeFormData(): array
     {
         return [
-            'departments' => \App\Models\Department::query()->where('is_active', true)->orderBy('name')->get(),
-            'designations' => \App\Models\Designation::query()->where('is_active', true)->orderBy('name')->get(),
+            'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
+            'designations' => Designation::query()->where('is_active', true)->orderBy('name')->get(),
             'allowanceTypes' => AllowanceType::query()->where('is_active', true)->orderBy('sort_order')->get(),
         ];
     }

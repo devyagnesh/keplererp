@@ -45,6 +45,8 @@
             window.erpTableConfig = {
                 tableSelector: '#grnTable',
                 dataUrl: @json(route('admin.purchase.grns.data')),
+                postActionSelector: '.js-grn-post',
+                postConfirm: 'Post this GRN to inventory and accounts?',
                 columns: [
                     { data: 'grn_number', name: 'grn_number' },
                     { data: 'vendor', name: 'vendor', orderable: false },

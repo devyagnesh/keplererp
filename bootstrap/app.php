@@ -1,8 +1,15 @@
 <?php
 
+use App\Http\Middleware\EnsureValidLicense;
+use App\Http\Middleware\EnsureVendorPasswordChanged;
+use App\Http\Middleware\SecurityHeaders;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -10,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule): void {
+    ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('erp:expire-sales-quotations')->dailyAt('00:15');
         $schedule->command('whatsapp:send-license-expiry-alerts')->dailyAt('07:30');
         $schedule->command('whatsapp:send-low-stock-alerts')->dailyAt('08:00');
@@ -19,14 +26,15 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
-            'license' => \App\Http\Middleware\EnsureValidLicense::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'license' => EnsureValidLicense::class,
+            'vendor.password' => EnsureVendorPasswordChanged::class,
         ]);
         $middleware->appendToGroup('web', [
-            \App\Http\Middleware\EnsureValidLicense::class,
-            \App\Http\Middleware\SecurityHeaders::class,
+            EnsureValidLicense::class,
+            SecurityHeaders::class,
         ]);
         $middleware->redirectUsersTo(fn () => route('admin.home'));
     })

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property int $parent_item_id
  * @property int $version
+ * @property string $batch_yield_qty
  * @property bool $is_active
  * @property string|null $notes
  */
@@ -21,6 +22,7 @@ class BillOfMaterial extends Model
     protected $fillable = [
         'parent_item_id',
         'version',
+        'batch_yield_qty',
         'is_active',
         'notes',
     ];

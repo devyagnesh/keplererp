@@ -43,7 +43,7 @@
             window.erpTableConfig = {
                 tableSelector: '#payrollTable',
                 dataUrl: @json(route('admin.hr.payroll-runs.data')),
-                postActionSelector: '.js-payroll-process',
+                postActionSelector: '.js-payroll-process, .js-payroll-lock-attendance, .js-payroll-approve',
                 postConfirm: 'Mark this payroll run as processed?',
                 columns: [
                     { data: 'period', name: 'period', orderable: false },

@@ -44,6 +44,7 @@ class Employee extends Model
         'hra',
         'pf_number',
         'esi_number',
+        'monthly_tds',
         'whatsapp',
         'department_id',
         'designation_id',
@@ -70,6 +71,7 @@ class Employee extends Model
             'date_of_birth' => 'date',
             'basic_salary' => 'decimal:2',
             'hra' => 'decimal:2',
+            'monthly_tds' => 'decimal:2',
         ];
     }
 

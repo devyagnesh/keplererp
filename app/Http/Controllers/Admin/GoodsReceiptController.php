@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Admin\Concerns\IssuesDocumentNumbers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreGoodsReceiptRequest;
@@ -11,16 +12,14 @@ use App\Models\PurchaseOrder;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Warehouse;
-use App\Services\GoodsReceiptAccountingService;
-use App\Enums\PdfDocumentType;
-use App\Services\InventoryStockService;
+use App\Services\GoodsReceiptPostService;
 use App\Services\Pdf\PdfGeneratorService;
-use App\Services\WhatsApp\WhatsAppNotificationService;
 use App\Support\ErpDataTable;
 use App\Support\PdfDownloadLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
@@ -32,9 +31,7 @@ class GoodsReceiptController extends Controller
     use IssuesDocumentNumbers;
 
     public function __construct(
-        protected InventoryStockService $stockService,
-        protected GoodsReceiptAccountingService $grnAccounting,
-        protected WhatsAppNotificationService $whatsappNotifications,
+        protected GoodsReceiptPostService $grnPost,
         protected PdfGeneratorService $pdfGenerator
     ) {}
 
@@ -95,6 +92,10 @@ class GoodsReceiptController extends Controller
         $html = '<div class="btn-list d-flex flex-wrap gap-1">';
         if ($actor->can('view', $grn) && $grn->status === 'posted') {
             $html .= PdfDownloadLink::button(route('admin.purchase.grns.pdf', $grn));
+        }
+        if ($actor->can('post', $grn) && $grn->status === 'draft') {
+            $html .= '<button type="button" class="btn btn-sm btn-success btn-wave js-grn-post" data-url="'
+                .e(route('admin.purchase.grns.post', $grn)).'">Post</button>';
         }
         $html .= '</div>';
 
@@ -166,6 +167,8 @@ class GoodsReceiptController extends Controller
                     'quantity' => (string) $line['quantity'],
                     'accepted_qty' => $accepted,
                     'rejected_qty' => $rejected,
+                    'qc_status' => $line['qc_status'] ?? null,
+                    'qc_remarks' => $line['qc_remarks'] ?? null,
                     'batch_no' => isset($line['batch_no']) && $line['batch_no'] !== ''
                         ? (string) $line['batch_no']
                         : null,
@@ -178,8 +181,14 @@ class GoodsReceiptController extends Controller
                 ];
             }
 
+            $qcPhotoPath = null;
+            $qcPhoto = $request->file('qc_photo');
+            if ($qcPhoto instanceof UploadedFile) {
+                $qcPhotoPath = $qcPhoto->store('grn/qc-photos', 'local');
+            }
+
             $postedGrn = null;
-            DB::transaction(function () use ($v, $user, $lines, $po, &$postedGrn): void {
+            DB::transaction(function () use ($v, $user, $lines, $po, $qcPhotoPath, &$postedGrn): void {
                 $grn = GoodsReceipt::query()->create([
                     'grn_number' => $this->nextDocumentCode('goods_receipts', 'GRN-'),
                     'purchase_order_id' => $po->id,
@@ -188,8 +197,9 @@ class GoodsReceiptController extends Controller
                     'received_at' => $v['received_at'],
                     'created_by' => $user->id,
                     'notes' => $v['notes'] ?? null,
-                    'status' => 'posted',
-                    'posted_at' => now(),
+                    'qc_officer_name' => $v['qc_officer_name'] ?? null,
+                    'qc_photo_path' => $qcPhotoPath,
+                    'status' => 'draft',
                 ]);
                 foreach ($lines as $line) {
                     $grn->lines()->create([
@@ -197,35 +207,19 @@ class GoodsReceiptController extends Controller
                         'quantity' => $line['quantity'],
                         'accepted_qty' => $line['accepted_qty'],
                         'rejected_qty' => $line['rejected_qty'],
+                        'qc_status' => $line['qc_status'],
+                        'qc_remarks' => $line['qc_remarks'],
                         'batch_no' => $line['batch_no'],
                         'serial_no' => $line['serial_no'],
                         'expiry_date' => $line['expiry_date'],
                     ]);
                 }
-                $stockLines = [];
-                foreach ($lines as $line) {
-                    $stockLines[] = [
-                        'item_id' => $line['item_id'],
-                        'accepted_qty' => $line['accepted_qty'],
-                        'batch_no' => $line['batch_no'],
-                        'serial_no' => $line['serial_no'],
-                        'expiry_date' => $line['expiry_date'],
-                    ];
-                }
-                $this->stockService->applyGoodsReceipt($grn, $stockLines, $user->id);
-                $grn->load('lines');
-                $this->grnAccounting->postPayableAndJournal($grn, $user->id);
                 $postedGrn = $grn;
             });
 
-            if ($postedGrn instanceof GoodsReceipt) {
-                $this->whatsappNotifications->notifyGrnPosted($postedGrn);
-                $this->pdfGenerator->queue(PdfDocumentType::Grn, $postedGrn, $user->id);
-            }
-
             return response()->json([
                 'status' => true,
-                'message' => 'Goods receipt posted to inventory and accounts.',
+                'message' => 'Goods receipt saved as draft. Post from the GRN list when QC is complete.',
             ], 201);
         } catch (InvalidArgumentException $e) {
             return response()->json([
@@ -239,6 +233,30 @@ class GoodsReceiptController extends Controller
                 'status' => false,
                 'message' => 'Could not create goods receipt.',
             ], 500);
+        }
+    }
+
+    public function post(Request $request, GoodsReceipt $goodsReceipt): JsonResponse
+    {
+        $this->authorize('post', $goodsReceipt);
+        $user = $request->user();
+        if ($user === null) {
+            abort(403);
+        }
+
+        try {
+            $this->grnPost->post($goodsReceipt, $user);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Goods receipt posted to inventory and accounts.',
+            ]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['status' => false, 'message' => $e->getMessage()], 422);
+        } catch (Throwable $e) {
+            Log::error('GoodsReceiptController@post failed', ['message' => $e->getMessage()]);
+
+            return response()->json(['status' => false, 'message' => 'Could not post goods receipt.'], 500);
         }
     }
 }

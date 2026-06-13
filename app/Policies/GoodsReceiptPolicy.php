@@ -22,6 +22,11 @@ class GoodsReceiptPolicy
         return $user->can('purchase.grn.create') && $user->can('inventory.grn');
     }
 
+    public function post(User $user, GoodsReceipt $goodsReceipt): bool
+    {
+        return $user->can('purchase.grn.create') && $user->can('inventory.grn') && $goodsReceipt->status === 'draft';
+    }
+
     public function update(User $user, GoodsReceipt $goodsReceipt): bool
     {
         return false;

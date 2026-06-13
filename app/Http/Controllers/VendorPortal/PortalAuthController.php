@@ -4,12 +4,14 @@ namespace App\Http\Controllers\VendorPortal;
 
 use App\Enums\VendorStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\VendorPortal\ChangePortalPasswordRequest;
 use App\Http\Requests\VendorPortal\StoreVendorInvoiceRequest;
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
 use App\Models\Vendor;
 use App\Models\VendorPayable;
 use App\Services\VendorInvoiceService;
+use App\Services\WhatsApp\WhatsAppNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -57,9 +59,45 @@ class PortalAuthController extends Controller
 
         Auth::guard('vendor')->login($vendor);
 
+        $redirect = $vendor->portal_must_change_password
+            ? route('vendor.portal.change-password')
+            : route('vendor.portal.dashboard');
+
         return response()->json([
             'status' => true,
             'message' => 'Logged in successfully.',
+            'redirect' => $redirect,
+        ]);
+    }
+
+    public function showChangePassword(): View
+    {
+        return view('vendor-portal.change-password');
+    }
+
+    public function changePassword(ChangePortalPasswordRequest $request): JsonResponse
+    {
+        $vendor = Auth::guard('vendor')->user();
+        if (! $vendor instanceof Vendor) {
+            abort(403);
+        }
+
+        if (! Hash::check($request->string('current_password')->toString(), (string) $vendor->portal_password)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Current password is incorrect.',
+            ], 422);
+        }
+
+        $vendor->update([
+            'portal_password' => $request->string('password')->toString(),
+            'portal_must_change_password' => false,
+            'portal_password_changed_at' => now(),
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Password changed successfully.',
             'redirect' => route('vendor.portal.dashboard'),
         ]);
     }
@@ -195,6 +233,8 @@ class PortalAuthController extends Controller
             ], 422);
         }
         $purchaseOrder->update(['status' => 'accepted']);
+        $purchaseOrder->loadMissing('creator');
+        app(WhatsAppNotificationService::class)->notifyVendorPoAccepted($purchaseOrder);
 
         return response()->json([
             'status' => true,

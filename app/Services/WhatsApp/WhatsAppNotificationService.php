@@ -5,17 +5,18 @@ namespace App\Services\WhatsApp;
 use App\Jobs\SendWhatsAppTemplateJob;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Employee;
 use App\Models\GoodsReceipt;
 use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\LeaveApplication;
 use App\Models\License;
-use App\Models\Employee;
 use App\Models\Payment;
+use App\Models\PayrollRun;
 use App\Models\ProductionOrder;
 use App\Models\PurchaseOrder;
-use App\Models\PayrollRun;
 use App\Models\PurchaseRequisition;
+use App\Models\SalesQuotation;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\WhatsAppLog;
@@ -565,6 +566,127 @@ class WhatsAppNotificationService
             $params,
             PayrollRun::class,
             $run->id,
+            $employee->name
+        );
+    }
+
+    /**
+     * Vendor portal credentials (SRS WA-13).
+     */
+    public function notifyVendorPortalCredentials(Vendor $vendor, string $portalUrl, string $plainPassword): void
+    {
+        if (! $this->isEnabledForCompany()) {
+            return;
+        }
+        $to = $this->normalizeToE164($vendor->phone);
+        if ($to === null) {
+            return;
+        }
+        $template = (string) config('whatsapp.templates.vendor_portal', 'vendor_portal');
+        $this->dispatchTemplate(
+            $to,
+            'vendor_portal',
+            $template,
+            [
+                $vendor->name,
+                $portalUrl,
+                $plainPassword,
+            ],
+            Vendor::class,
+            $vendor->id,
+            $vendor->name
+        );
+    }
+
+    /**
+     * Vendor accepted PO on portal — notify purchase manager.
+     */
+    public function notifyVendorPoAccepted(PurchaseOrder $purchaseOrder): void
+    {
+        if (! $this->isEnabledForCompany()) {
+            return;
+        }
+        $purchaseOrder->loadMissing(['vendor', 'creator']);
+        $user = $purchaseOrder->creator;
+        if (! $user instanceof User) {
+            return;
+        }
+        $to = $this->normalizeToE164($user->whatsapp_number);
+        if ($to === null) {
+            return;
+        }
+        $template = (string) config('whatsapp.templates.po_vendor_accepted', 'po_vendor_accepted');
+        $this->dispatchTemplate(
+            $to,
+            'po_vendor_accepted',
+            $template,
+            [
+                $purchaseOrder->po_number,
+                $purchaseOrder->vendor?->name ?? 'Vendor',
+            ],
+            PurchaseOrder::class,
+            $purchaseOrder->id,
+            $user->name
+        );
+    }
+
+    /**
+     * Quotation PDF link shared to customer (SRS UC 22.2).
+     */
+    public function notifyQuotationSent(SalesQuotation $quotation, string $pdfUrl): void
+    {
+        if (! $this->isEnabledForCompany()) {
+            return;
+        }
+        $quotation->loadMissing('customer');
+        $customer = $quotation->customer;
+        if ($customer === null) {
+            return;
+        }
+        $to = $this->normalizeToE164($customer->phone);
+        if ($to === null) {
+            return;
+        }
+        $template = (string) config('whatsapp.templates.quotation_sent', 'quotation_sent');
+        $this->dispatchTemplate(
+            $to,
+            'quotation_sent',
+            $template,
+            [
+                $quotation->quote_number,
+                (string) $quotation->total_amount,
+                $pdfUrl,
+            ],
+            SalesQuotation::class,
+            $quotation->id,
+            $customer->name
+        );
+    }
+
+    /**
+     * Employee onboarding login credentials (SRS UC 22.6).
+     */
+    public function notifyEmployeePortalCredentials(Employee $employee, string $loginEmail, string $plainPassword): void
+    {
+        if (! $this->isEnabledForCompany()) {
+            return;
+        }
+        $to = $this->normalizeToE164($employee->whatsapp ?? $employee->phone);
+        if ($to === null) {
+            return;
+        }
+        $template = (string) config('whatsapp.templates.employee_portal', 'employee_portal');
+        $this->dispatchTemplate(
+            $to,
+            'employee_portal',
+            $template,
+            [
+                $employee->name,
+                $loginEmail,
+                $plainPassword,
+            ],
+            Employee::class,
+            $employee->id,
             $employee->name
         );
     }

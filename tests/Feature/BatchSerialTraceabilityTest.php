@@ -11,10 +11,12 @@ use App\Models\Vendor;
 use App\Models\Warehouse;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\PostsGoodsReceipts;
 use Tests\TestCase;
 
 class BatchSerialTraceabilityTest extends TestCase
 {
+    use PostsGoodsReceipts;
     use RefreshDatabase;
 
     public function test_traceability_dashboard_and_fefo_data_with_expiry(): void
@@ -51,6 +53,8 @@ class BatchSerialTraceabilityTest extends TestCase
                 ],
             ],
         ])->assertCreated();
+
+        $this->postLatestGrn($user);
 
         $this->assertDatabaseHas('stock_ledger', [
             'item_id' => $item->id,

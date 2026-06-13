@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Admin\Concerns\IssuesDocumentNumbers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RejectPurchaseOrderRequest;
 use App\Http\Requests\StorePurchaseOrderRequest;
+use App\Mail\PurchaseOrderSentMail;
 use App\Models\Company;
 use App\Models\Item;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequisition;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Enums\PdfDocumentType;
+use App\Models\Warehouse;
 use App\Services\GstCalculationService;
 use App\Services\Pdf\PdfGeneratorService;
 use App\Services\PoApprovalService;
@@ -24,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Throwable;
@@ -142,7 +145,7 @@ class PurchaseOrderController extends Controller
         return view('admin.purchase.orders-create', [
             'vendors' => Vendor::query()->orderBy('name')->get(['id', 'name', 'vendor_code']),
             'items' => Item::query()->where('is_active', true)->orderBy('sku')->get(['id', 'sku', 'name']),
-            'warehouses' => \App\Models\Warehouse::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
+            'warehouses' => Warehouse::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
             'approvedRequisitions' => PurchaseRequisition::query()
                 ->where('status', 'approved')
                 ->orderByDesc('id')
@@ -436,13 +439,13 @@ class PurchaseOrderController extends Controller
             $purchaseOrder->loadMissing('vendor');
             $purchaseOrder->refresh();
             $this->whatsappNotifications->notifyPurchaseOrderDispatchedToVendor($purchaseOrder);
+            $document = $this->pdfGenerator->generate(PdfDocumentType::PurchaseOrder, $purchaseOrder, $request->user()?->id);
             $vendorEmail = $purchaseOrder->vendor?->email;
             if ($vendorEmail !== null && $vendorEmail !== '') {
-                \Illuminate\Support\Facades\Mail::to($vendorEmail)->queue(
-                    new \App\Mail\PurchaseOrderSentMail($purchaseOrder)
+                Mail::to($vendorEmail)->queue(
+                    new PurchaseOrderSentMail($purchaseOrder, $document)
                 );
             }
-            $this->pdfGenerator->queue(PdfDocumentType::PurchaseOrder, $purchaseOrder, $request->user()?->id);
 
             return response()->json([
                 'status' => true,

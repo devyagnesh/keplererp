@@ -202,7 +202,7 @@ class InventoryStockService
      */
     public function reserveForSalesOrder(SalesOrder $so, ?int $userId): void
     {
-        DB::transaction(function () use ($so, $userId): void {
+        DB::transaction(function () use ($so): void {
             $warehouseId = (int) $so->warehouse_id;
             if ($warehouseId <= 0) {
                 throw new InvalidArgumentException('Sales order warehouse is required for reservations.');
@@ -322,10 +322,23 @@ class InventoryStockService
             if ($warehouseId <= 0) {
                 throw new InvalidArgumentException('Production order warehouse is required.');
             }
+            $order->loadMissing('materials');
+            $materialQtyByItem = [];
+            foreach ($order->materials as $material) {
+                $qty = $material->actual_qty ?? $material->planned_qty;
+                if ($qty !== null && bccomp((string) $qty, '0', 4) > 0) {
+                    $materialQtyByItem[(int) $material->item_id] = (string) $qty;
+                }
+            }
             $bom->loadMissing('lines');
             foreach ($bom->lines as $bomLine) {
-                $need = bcmul((string) $bomLine->quantity_per, $outputQty, 6);
-                $need = bcadd($need, '0', 4);
+                $componentId = (int) $bomLine->component_item_id;
+                if (isset($materialQtyByItem[$componentId])) {
+                    $need = $materialQtyByItem[$componentId];
+                } else {
+                    $need = bcmul((string) $bomLine->quantity_per, $outputQty, 6);
+                    $need = bcadd($need, '0', 4);
+                }
                 if (bccomp($need, '0', 4) <= 0) {
                     continue;
                 }

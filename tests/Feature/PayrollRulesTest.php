@@ -12,10 +12,12 @@ use App\Models\User;
 use App\Services\PayrollRunService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ProcessesPayrollRuns;
 use Tests\TestCase;
 
 class PayrollRulesTest extends TestCase
 {
+    use ProcessesPayrollRuns;
     use RefreshDatabase;
 
     public function test_payroll_uses_configured_pf_rate(): void
@@ -85,7 +87,7 @@ class PayrollRulesTest extends TestCase
             'created_by' => $user->id,
         ]);
 
-        $this->actingAs($user)->postJson(route('admin.hr.payroll-runs.process', $run))->assertOk();
+        $this->lockAndProcessPayroll($run, $user);
 
         $detail = PayrollDetail::query()->where('payroll_run_id', $run->id)->where('employee_id', $employee->id)->first();
         $this->assertNotNull($detail);

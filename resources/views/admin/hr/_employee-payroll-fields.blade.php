@@ -38,6 +38,18 @@
         <input type="text" name="bank_ifsc" class="form-control" maxlength="11"
             value="{{ old('bank_ifsc', $employee->bank_ifsc ?? '') }}">
     </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label">Monthly TDS deduction</label>
+        <input type="number" step="0.01" name="monthly_tds" class="form-control" min="0"
+            value="{{ old('monthly_tds', $employee->monthly_tds ?? '0') }}">
+    </div>
+</div>
+
+<input type="hidden" name="create_login" value="0">
+<div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" name="create_login" value="1" id="empCreateLogin"
+        {{ old('create_login') ? 'checked' : '' }}>
+    <label class="form-check-label" for="empCreateLogin">Create staff portal login (email required)</label>
 </div>
 
 <input type="hidden" name="pf_opted_in" value="0">

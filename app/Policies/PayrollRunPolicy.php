@@ -27,6 +27,21 @@ class PayrollRunPolicy
         return $user->can('hr.payroll.run') && $payrollRun->status === 'draft';
     }
 
+    public function markPaid(User $user, PayrollRun $payrollRun): bool
+    {
+        return $user->can('hr.payroll.run') && $payrollRun->status === 'approved';
+    }
+
+    public function approve(User $user, PayrollRun $payrollRun): bool
+    {
+        return $user->can('hr.payroll.run') && $payrollRun->status === 'processed';
+    }
+
+    public function lockAttendance(User $user, PayrollRun $payrollRun): bool
+    {
+        return $user->can('hr.payroll.run') && $payrollRun->status === 'draft';
+    }
+
     public function delete(User $user, PayrollRun $payrollRun): bool
     {
         return $user->can('hr.payroll.run') && $payrollRun->status === 'draft';

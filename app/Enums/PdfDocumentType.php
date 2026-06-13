@@ -19,6 +19,9 @@ enum PdfDocumentType: string
     case Gstr3b = 'gstr3b';
     case VendorStatement = 'vendor_statement';
     case ProductionOrder = 'production_order';
+    case TransferChallan = 'transfer_challan';
+    case VendorPaymentAdvice = 'vendor_payment_advice';
+    case PickList = 'pick_list';
 
     /**
      * Storage module folder under documents/.
@@ -26,11 +29,11 @@ enum PdfDocumentType: string
     public function module(): string
     {
         return match ($this) {
-            self::TaxInvoice, self::Quotation, self::DeliveryChallan => 'sales',
+            self::TaxInvoice, self::Quotation, self::DeliveryChallan, self::PickList => 'sales',
             self::PurchaseOrder, self::Grn => 'purchase',
             self::Payslip, self::PayrollSummary => 'hr',
-            self::StockLedger => 'inventory',
-            self::Gstr1, self::Gstr3b, self::VendorStatement => 'finance',
+            self::StockLedger, self::TransferChallan => 'inventory',
+            self::Gstr1, self::Gstr3b, self::VendorStatement, self::VendorPaymentAdvice => 'finance',
             self::ProductionOrder => 'production',
         };
     }
@@ -53,6 +56,9 @@ enum PdfDocumentType: string
             self::Gstr3b => 'pdfs.finance.gstr3b',
             self::VendorStatement => 'pdfs.finance.vendor-statement',
             self::ProductionOrder => 'pdfs.production.production-order',
+            self::TransferChallan => 'pdfs.inventory.transfer-challan',
+            self::VendorPaymentAdvice => 'pdfs.finance.vendor-payment-advice',
+            self::PickList => 'pdfs.sales.pick-list',
         };
     }
 
@@ -85,6 +91,9 @@ enum PdfDocumentType: string
             self::Gstr3b => 'GSTR-3B SUMMARY',
             self::VendorStatement => 'VENDOR STATEMENT',
             self::ProductionOrder => 'PRODUCTION ORDER',
+            self::TransferChallan => 'TRANSFER CHALLAN',
+            self::VendorPaymentAdvice => 'VENDOR PAYMENT ADVICE',
+            self::PickList => 'PICK LIST',
         };
     }
 }

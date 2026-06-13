@@ -35,6 +35,46 @@
         </div>
     </div>
 
+    <div class="modal fade" id="soPickListModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Pick list — scan barcodes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Scan SKU barcode</label>
+                        <input type="text" class="form-control js-barcode-input" placeholder="Scan or type SKU and press Enter" autocomplete="off">
+                    </div>
+                    <ul class="list-group list-group-flush mb-3 js-scanned-list"></ul>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Stock</th>
+                                    <th>Status</th>
+                                    <th>Picked</th>
+                                </tr>
+                            </thead>
+                            <tbody class="js-pick-lines"></tbody>
+                        </table>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Packaging notes</label>
+                        <input type="text" name="packaging_notes" class="form-control" maxlength="500" placeholder="e.g. 10 boxes × 50 pcs">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary js-pick-confirm">Confirm pick</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="soDispatchModal" tabindex="-1" aria-labelledby="soDispatchModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -100,5 +140,6 @@
         <script src="{{ asset('js/modules/erp/batch-serial.js') }}"></script>
         <script src="{{ asset('js/modules/erp/configurable-dt.js') }}"></script>
         <script src="{{ asset('js/modules/erp/sales-order-dispatch.js') }}"></script>
+        <script src="{{ asset('js/modules/erp/sales-order-pick-list.js') }}"></script>
     @endpush
 </x-layouts.app>

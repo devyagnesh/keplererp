@@ -2,25 +2,29 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Admin\Concerns\IssuesDocumentNumbers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductionOrderRequest;
+use App\Http\Requests\UpdateProductionMaterialsRequest;
 use App\Http\Requests\UpdateProductionOrderRequest;
 use App\Models\BillOfMaterial;
+use App\Models\InventoryBalance;
 use App\Models\Item;
 use App\Models\ProductionOrder;
+use App\Models\ProductionOrderMaterial;
 use App\Models\User;
+use App\Models\Warehouse;
+use App\Services\AuditLogService;
+use App\Services\InventoryStockService;
+use App\Services\Pdf\PdfGeneratorService;
+use App\Services\ProductionAccountingService;
+use App\Services\ProductionReleaseService;
+use App\Services\WhatsApp\WhatsAppNotificationService;
 use App\Support\ErpDataTable;
 use App\Support\PdfDownloadLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use App\Services\AuditLogService;
-use App\Services\ProductionReleaseService;
-use App\Enums\PdfDocumentType;
-use App\Services\InventoryStockService;
-use App\Services\Pdf\PdfGeneratorService;
-use App\Services\WhatsApp\WhatsAppNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
@@ -35,7 +39,8 @@ class ProductionOrderController extends Controller
         protected WhatsAppNotificationService $whatsapp,
         protected AuditLogService $auditLog,
         protected PdfGeneratorService $pdfGenerator,
-        protected ProductionReleaseService $productionRelease
+        protected ProductionReleaseService $productionRelease,
+        protected ProductionAccountingService $productionAccounting
     ) {}
 
     public function index(): View
@@ -108,7 +113,7 @@ class ProductionOrderController extends Controller
 
         return view('admin.production.work-orders-create', [
             'items' => Item::query()->where('is_active', true)->orderBy('sku')->get(['id', 'sku', 'name']),
-            'warehouses' => \App\Models\Warehouse::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
+            'warehouses' => Warehouse::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
 
@@ -151,8 +156,55 @@ class ProductionOrderController extends Controller
     public function edit(ProductionOrder $productionOrder): View
     {
         $this->authorize('update', $productionOrder);
+        $productionOrder->load(['materials.item', 'item', 'warehouse']);
 
-        return view('admin.production.work-orders-edit', ['productionOrder' => $productionOrder]);
+        $materials = $productionOrder->materials;
+        if ($materials->isEmpty() && $productionOrder->status === 'in_progress') {
+            $this->productionRelease->releaseMaterials($productionOrder);
+            $productionOrder->load(['materials.item']);
+            $materials = $productionOrder->materials;
+        }
+
+        $stockMap = [];
+        if ($productionOrder->warehouse_id !== null) {
+            foreach ($materials as $mat) {
+                $qty = InventoryBalance::query()
+                    ->where('warehouse_id', $productionOrder->warehouse_id)
+                    ->where('item_id', $mat->item_id)
+                    ->value('quantity');
+                $stockMap[$mat->item_id] = (string) ($qty ?? '0');
+            }
+        }
+
+        return view('admin.production.work-orders-edit', [
+            'productionOrder' => $productionOrder,
+            'materials' => $materials,
+            'stockMap' => $stockMap,
+        ]);
+    }
+
+    public function updateMaterials(UpdateProductionMaterialsRequest $request, ProductionOrder $productionOrder): JsonResponse
+    {
+        try {
+            foreach ($request->validated('materials') as $row) {
+                ProductionOrderMaterial::query()
+                    ->where('production_order_id', $productionOrder->id)
+                    ->where('id', (int) $row['id'])
+                    ->update(['actual_qty' => (string) $row['actual_qty']]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Material consumption saved.',
+            ]);
+        } catch (Throwable $e) {
+            Log::error('ProductionOrderController@updateMaterials failed', ['message' => $e->getMessage()]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Could not save materials.',
+            ], 500);
+        }
     }
 
     public function update(UpdateProductionOrderRequest $request, ProductionOrder $productionOrder): JsonResponse
@@ -178,6 +230,12 @@ class ProductionOrderController extends Controller
                     }
                     $outQty = $request->validated('actual_qty') ?? $productionOrder->qty_planned;
                     $this->stockService->applyProductionCompletion(
+                        $productionOrder,
+                        $bom,
+                        (string) $outQty,
+                        $user?->id
+                    );
+                    $this->productionAccounting->postCompletionJournal(
                         $productionOrder,
                         $bom,
                         (string) $outQty,

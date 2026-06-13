@@ -14,7 +14,11 @@
                 <a href="{{ route('admin.inventory.adjust.form') }}" class="btn btn-outline-primary btn-wave">Adjust</a>
             @endcan
             @can('inventory.transfer')
-                <a href="{{ route('admin.inventory.transfer.form') }}" class="btn btn-outline-primary btn-wave">Transfer</a>
+                <a href="{{ route('admin.inventory.transfer.form') }}" class="btn btn-outline-primary btn-wave">Quick transfer</a>
+                <a href="{{ route('admin.inventory.warehouse-transfers.index') }}" class="btn btn-outline-primary btn-wave">Transfer workflow</a>
+            @endcan
+            @can('inventory.adjust')
+                <a href="{{ route('admin.inventory.stock-reconciliations.index') }}" class="btn btn-outline-warning btn-wave">Reconciliation</a>
             @endcan
             @can('reports.inventory')
                 <a href="{{ route('admin.inventory.traceability.index') }}" class="btn btn-outline-info btn-wave">Batch traceability</a>

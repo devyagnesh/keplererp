@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RecordGstFilingRequest;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Employee;
@@ -11,10 +13,9 @@ use App\Models\ProductionOrder;
 use App\Models\PurchaseOrder;
 use App\Models\SalesOrder;
 use App\Models\Vendor;
-use App\Enums\PdfDocumentType;
-use App\Services\GstrExportService;
 use App\Services\FinancialReportService;
 use App\Services\GstPeriodLockService;
+use App\Services\GstrExportService;
 use App\Services\Pdf\PdfGeneratorService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -122,6 +123,28 @@ class ReportsController extends Controller
         } catch (\InvalidArgumentException $e) {
             return response()->json(['status' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    public function recordGstFiling(RecordGstFilingRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $lock = $this->gstPeriodLock->recordFiling(
+            (int) $data['year'],
+            (int) $data['month'],
+            $data['gstr1_arn'] ?? null,
+            $data['gstr3b_arn'] ?? null,
+            isset($data['gstr3b_tax_paid']) ? (string) $data['gstr3b_tax_paid'] : null,
+            $request->user()
+        );
+
+        return response()->json([
+            'status' => true,
+            'message' => 'GST filing ARN recorded.',
+            'data' => [
+                'gstr1_arn' => $lock->gstr1_arn,
+                'gstr3b_arn' => $lock->gstr3b_arn,
+            ],
+        ]);
     }
 
     public function exportGstr3b(Request $request): StreamedResponse

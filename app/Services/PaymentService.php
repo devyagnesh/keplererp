@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\PdfDocumentType;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\VendorPayable;
+use App\Services\Pdf\PdfGeneratorService;
 use App\Services\WhatsApp\WhatsAppNotificationService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -19,7 +21,8 @@ class PaymentService
 {
     public function __construct(
         protected AccountingJournalService $journal,
-        protected WhatsAppNotificationService $whatsapp
+        protected WhatsAppNotificationService $whatsapp,
+        protected PdfGeneratorService $pdfGenerator
     ) {}
 
     /**
@@ -85,6 +88,9 @@ class PaymentService
             if ($payable->vendor !== null) {
                 $this->whatsapp->notifyVendorPaymentSent($payment, $payable->vendor);
             }
+
+            $payment->loadMissing('vendor');
+            $this->pdfGenerator->queue(PdfDocumentType::VendorPaymentAdvice, $payment, $user->id);
 
             return $payment;
         });

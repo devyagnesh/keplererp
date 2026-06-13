@@ -7,6 +7,7 @@ use App\Http\Requests\StoreLeaveApplicationRequest;
 use App\Models\Employee;
 use App\Models\LeaveApplication;
 use App\Models\User;
+use App\Services\LeaveBalanceService;
 use App\Services\WhatsApp\WhatsAppNotificationService;
 use App\Support\ErpDataTable;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +22,8 @@ use Throwable;
 class LeaveApplicationController extends Controller
 {
     public function __construct(
-        protected WhatsAppNotificationService $whatsapp
+        protected WhatsAppNotificationService $whatsapp,
+        protected LeaveBalanceService $leaveBalances
     ) {}
 
     public function index(): View
@@ -135,6 +137,7 @@ class LeaveApplicationController extends Controller
 
         try {
             $user = request()->user();
+            $this->leaveBalances->deductOnApproval($leaveApplication);
             $leaveApplication->update([
                 'status' => 'approved',
                 'approved_by' => $user?->id,
@@ -146,6 +149,11 @@ class LeaveApplicationController extends Controller
                 'status' => true,
                 'message' => 'Leave approved.',
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (Throwable $e) {
             Log::error('LeaveApplicationController@approve failed', ['message' => $e->getMessage()]);
 

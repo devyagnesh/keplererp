@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\DesignationController;
 use App\Http\Controllers\Admin\DispatchChallanController;
 use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\FinancePaymentController;
+use App\Http\Controllers\Admin\GeneratedDocumentController;
 use App\Http\Controllers\Admin\GoodsReceiptController;
 use App\Http\Controllers\Admin\GrnReturnController;
 use App\Http\Controllers\Admin\InventoryBalanceController;
@@ -35,10 +36,12 @@ use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SalesEnquiryController;
 use App\Http\Controllers\Admin\SalesOrderController;
 use App\Http\Controllers\Admin\SalesQuotationController;
+use App\Http\Controllers\Admin\StockReconciliationController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\VendorInvoiceController;
 use App\Http\Controllers\Admin\WarehouseController;
+use App\Http\Controllers\Admin\WarehouseTransferController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DocumentDownloadController;
 use App\Http\Controllers\Employee\EmployeeAttendanceController;
@@ -298,6 +301,48 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/inventory/transfer', [InventoryStockController::class, 'transfer'])
             ->middleware('throttle:120,1')
             ->name('admin.inventory.transfer');
+        Route::get('/admin/inventory/warehouse-transfers', [WarehouseTransferController::class, 'index'])->name('admin.inventory.warehouse-transfers.index');
+        Route::post('/admin/inventory/warehouse-transfers/data', [WarehouseTransferController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.warehouse-transfers.data');
+        Route::get('/admin/inventory/warehouse-transfers/create', [WarehouseTransferController::class, 'create'])->name('admin.inventory.warehouse-transfers.create');
+        Route::post('/admin/inventory/warehouse-transfers', [WarehouseTransferController::class, 'store'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.warehouse-transfers.store');
+        Route::get('/admin/inventory/warehouse-transfers/{warehouseTransfer}', [WarehouseTransferController::class, 'show'])
+            ->name('admin.inventory.warehouse-transfers.show');
+        Route::post('/admin/inventory/warehouse-transfers/{warehouseTransfer}/approve', [WarehouseTransferController::class, 'approve'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.warehouse-transfers.approve');
+        Route::post('/admin/inventory/warehouse-transfers/{warehouseTransfer}/dispatch', [WarehouseTransferController::class, 'dispatch'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.warehouse-transfers.dispatch');
+        Route::post('/admin/inventory/warehouse-transfers/{warehouseTransfer}/receive', [WarehouseTransferController::class, 'receive'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.warehouse-transfers.receive');
+        Route::post('/admin/inventory/warehouse-transfers/{warehouseTransfer}/cancel', [WarehouseTransferController::class, 'cancel'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.warehouse-transfers.cancel');
+        Route::get('/admin/inventory/warehouse-transfers/{warehouseTransfer}/pdf', [WarehouseTransferController::class, 'downloadPdf'])
+            ->name('admin.inventory.warehouse-transfers.pdf');
+    });
+
+    Route::middleware('permission:inventory.adjust')->group(function (): void {
+        Route::get('/admin/inventory/stock-reconciliations', [StockReconciliationController::class, 'index'])->name('admin.inventory.stock-reconciliations.index');
+        Route::post('/admin/inventory/stock-reconciliations/data', [StockReconciliationController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.stock-reconciliations.data');
+        Route::post('/admin/inventory/stock-reconciliations', [StockReconciliationController::class, 'store'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.stock-reconciliations.store');
+        Route::get('/admin/inventory/stock-reconciliations/{stockReconciliation}', [StockReconciliationController::class, 'show'])
+            ->name('admin.inventory.stock-reconciliations.show');
+        Route::post('/admin/inventory/stock-reconciliations/{stockReconciliation}/counts', [StockReconciliationController::class, 'updateCounts'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.stock-reconciliations.counts');
+        Route::post('/admin/inventory/stock-reconciliations/{stockReconciliation}/post', [StockReconciliationController::class, 'post'])
+            ->middleware('throttle:120,1')
+            ->name('admin.inventory.stock-reconciliations.post');
     });
 
     Route::middleware('permission:purchase.pr.create')->group(function (): void {
@@ -368,6 +413,9 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('permission:purchase.grn.create')->group(function (): void {
         Route::get('/admin/purchase/grns/create', [GoodsReceiptController::class, 'create'])->name('admin.purchase.grns.create');
         Route::post('/admin/purchase/grns', [GoodsReceiptController::class, 'store'])->name('admin.purchase.grns.store');
+        Route::post('/admin/purchase/grns/{goods_receipt}/post', [GoodsReceiptController::class, 'post'])
+            ->middleware('throttle:120,1')
+            ->name('admin.purchase.grns.post');
         Route::post('/admin/purchase/grn-returns', [GrnReturnController::class, 'store'])->name('admin.purchase.grn-returns.store');
     });
 
@@ -431,6 +479,13 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/sales/orders/{sales_order}/dispatch', [SalesOrderController::class, 'dispatch'])
             ->middleware('throttle:120,1')
             ->name('admin.sales.orders.dispatch');
+        Route::get('/admin/sales/orders/{sales_order}/pick-list', [SalesOrderController::class, 'pickListData'])
+            ->name('admin.sales.orders.pick-list');
+        Route::post('/admin/sales/orders/{sales_order}/pick-list/confirm', [SalesOrderController::class, 'confirmPick'])
+            ->middleware('throttle:120,1')
+            ->name('admin.sales.orders.pick-list.confirm');
+        Route::get('/admin/sales/orders/{sales_order}/pick-list/pdf', [SalesOrderController::class, 'downloadPickListPdf'])
+            ->name('admin.sales.orders.pick-list.pdf');
     });
 
     Route::middleware('permission:customers.edit')->group(function (): void {
@@ -452,9 +507,16 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/reports/gst-period/lock', [ReportsController::class, 'lockGstPeriod'])
             ->middleware('throttle:60,1')
             ->name('admin.reports.gst-period.lock');
+        Route::post('/admin/reports/gst-period/filing', [ReportsController::class, 'recordGstFiling'])
+            ->middleware('throttle:60,1')
+            ->name('admin.reports.gst-period.filing');
         Route::get('/admin/reports/gstr3b', [ReportsController::class, 'exportGstr3b'])->name('admin.reports.gstr3b');
         Route::get('/admin/reports/gstr1/pdf', [ReportsController::class, 'exportGstr1Pdf'])->name('admin.reports.gstr1.pdf');
         Route::get('/admin/reports/gstr3b/pdf', [ReportsController::class, 'exportGstr3bPdf'])->name('admin.reports.gstr3b.pdf');
+        Route::get('/admin/reports/pdf-log', [GeneratedDocumentController::class, 'index'])->name('admin.reports.pdf-log.index');
+        Route::post('/admin/reports/pdf-log/data', [GeneratedDocumentController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('admin.reports.pdf-log.data');
         Route::get('/admin/reports/vendors/{vendor}/statement/pdf', [ReportsController::class, 'exportVendorStatementPdf'])
             ->name('admin.reports.vendor-statement.pdf');
         Route::get('/admin/finance/chart-of-accounts', [ChartOfAccountsController::class, 'index'])->name('admin.finance.chart-of-accounts.index');
@@ -479,6 +541,8 @@ Route::middleware('auth')->group(function (): void {
             ->name('admin.finance.payments.vendor');
         Route::post('/admin/finance/payments/customer', [FinancePaymentController::class, 'storeCustomerReceipt'])
             ->name('admin.finance.payments.customer');
+        Route::get('/admin/finance/payments/{payment}/advice-pdf', [FinancePaymentController::class, 'downloadPaymentAdvice'])
+            ->name('admin.finance.payments.advice-pdf');
         Route::post('/admin/finance/vendor-invoices/{vendorInvoice}/rematch', [VendorInvoiceController::class, 'rematch'])
             ->middleware('permission:finance.voucher.create')
             ->name('admin.finance.vendor-invoices.rematch');
@@ -514,6 +578,9 @@ Route::middleware('auth')->group(function (): void {
             ->name('admin.production.work-orders.data');
         Route::get('/admin/production/work-orders/{production_order}/edit', [ProductionOrderController::class, 'edit'])->name('admin.production.work-orders.edit');
         Route::put('/admin/production/work-orders/{production_order}', [ProductionOrderController::class, 'update'])->name('admin.production.work-orders.update');
+        Route::post('/admin/production/work-orders/{production_order}/materials', [ProductionOrderController::class, 'updateMaterials'])
+            ->middleware('throttle:120,1')
+            ->name('admin.production.work-orders.materials');
     });
     Route::middleware('permission:production.order.create')->group(function (): void {
         Route::get('/admin/production/work-orders/create', [ProductionOrderController::class, 'create'])->name('admin.production.work-orders.create');
@@ -589,10 +656,27 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/hr/payroll-runs/{payroll_run}/process', [PayrollRunController::class, 'process'])
             ->middleware('throttle:120,1')
             ->name('admin.hr.payroll-runs.process');
+        Route::post('/admin/hr/payroll-runs/{payroll_run}/approve', [PayrollRunController::class, 'approve'])
+            ->middleware('throttle:120,1')
+            ->name('admin.hr.payroll-runs.approve');
         Route::get('/admin/hr/payroll-runs/{payroll_run}', [PayrollRunController::class, 'show'])
             ->name('admin.hr.payroll-runs.show');
         Route::get('/admin/hr/payroll-runs/{payroll_run}/pdf', [PayrollRunController::class, 'downloadPdf'])
             ->name('admin.hr.payroll-runs.pdf');
+        Route::post('/admin/hr/payroll-runs/{payroll_run}/lock-attendance', [PayrollRunController::class, 'lockAttendance'])
+            ->middleware('throttle:120,1')
+            ->name('admin.hr.payroll-runs.lock-attendance');
+        Route::post('/admin/hr/payroll-runs/{payroll_run}/mark-paid', [PayrollRunController::class, 'markPaid'])
+            ->middleware('throttle:120,1')
+            ->name('admin.hr.payroll-runs.mark-paid');
+        Route::get('/admin/hr/payroll-runs/{payroll_run}/bank-export', [PayrollRunController::class, 'exportBankFile'])
+            ->name('admin.hr.payroll-runs.bank-export');
+        Route::get('/admin/hr/payroll-runs/{payroll_run}/pf-ecr', [PayrollRunController::class, 'exportPfEcr'])
+            ->name('admin.hr.payroll-runs.pf-ecr');
+        Route::get('/admin/hr/payroll-runs/{payroll_run}/esi-export', [PayrollRunController::class, 'exportEsi'])
+            ->name('admin.hr.payroll-runs.esi-export');
+        Route::get('/admin/hr/payroll-runs/{payroll_run}/pt-export', [PayrollRunController::class, 'exportPt'])
+            ->name('admin.hr.payroll-runs.pt-export');
         Route::get('/admin/hr/payroll-details/{payroll_detail}/pdf', [PayrollDetailController::class, 'downloadPdf'])
             ->name('admin.hr.payroll-details.pdf');
     });
@@ -626,15 +710,19 @@ Route::prefix('vendor')->name('vendor.portal.')->group(function (): void {
     Route::get('/login', [PortalAuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [PortalAuthController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
     Route::middleware('auth:vendor')->group(function (): void {
+        Route::get('/change-password', [PortalAuthController::class, 'showChangePassword'])->name('change-password');
+        Route::post('/change-password', [PortalAuthController::class, 'changePassword'])->name('change-password.submit');
         Route::post('/logout', [PortalAuthController::class, 'logout'])->name('logout');
-        Route::get('/dashboard', [PortalAuthController::class, 'dashboard'])->name('dashboard');
-        Route::post('/purchase-orders/{purchase_order}/accept', [PortalAuthController::class, 'acceptPo'])
-            ->name('po.accept');
-        Route::post('/vendor-invoices', [PortalAuthController::class, 'storeVendorInvoice'])
-            ->name('vendor-invoices.store');
-        Route::post('/purchase-orders/{purchase_order}/reject', [PortalAuthController::class, 'rejectPo'])
-            ->name('po.reject');
-        Route::post('/purchase-orders/{purchase_order}/delivery', [PortalAuthController::class, 'updateDelivery'])
-            ->name('po.delivery');
+        Route::middleware('vendor.password')->group(function (): void {
+            Route::get('/dashboard', [PortalAuthController::class, 'dashboard'])->name('dashboard');
+            Route::post('/purchase-orders/{purchase_order}/accept', [PortalAuthController::class, 'acceptPo'])
+                ->name('po.accept');
+            Route::post('/vendor-invoices', [PortalAuthController::class, 'storeVendorInvoice'])
+                ->name('vendor-invoices.store');
+            Route::post('/purchase-orders/{purchase_order}/reject', [PortalAuthController::class, 'rejectPo'])
+                ->name('po.reject');
+            Route::post('/purchase-orders/{purchase_order}/delivery', [PortalAuthController::class, 'updateDelivery'])
+                ->name('po.delivery');
+        });
     });
 });

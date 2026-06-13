@@ -2,27 +2,34 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Admin\Concerns\IssuesDocumentNumbers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DispatchSalesOrderRequest;
+use App\Http\Requests\MarkSalesOrderProcessingRequest;
 use App\Http\Requests\StoreSalesOrderRequest;
-use App\Services\BatchSerialInventoryService;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\SalesOrder;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\AuditLogService;
-use App\Http\Requests\MarkSalesOrderProcessingRequest;
+use App\Services\BatchSerialInventoryService;
 use App\Services\DispatchChallanService;
-use App\Services\PriceListService;
-use App\Services\ProductionSuggestService;
-use App\Services\SalesOrderProcessingService;
 use App\Services\GstCalculationService;
 use App\Services\InventoryStockService;
+use App\Services\Pdf\PdfGeneratorService;
+use App\Services\PriceListService;
+use App\Services\ProductionSuggestService;
+use App\Services\Sales\SalesPickListService;
+use App\Services\SalesInvoiceService;
+use App\Services\SalesOrderProcessingService;
 use App\Support\ErpDataTable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
@@ -40,7 +47,9 @@ class SalesOrderController extends Controller
         protected SalesOrderProcessingService $orderProcessing,
         protected PriceListService $priceLists,
         protected ProductionSuggestService $productionSuggest,
-        protected BatchSerialInventoryService $batchSerial
+        protected BatchSerialInventoryService $batchSerial,
+        protected SalesPickListService $pickList,
+        protected PdfGeneratorService $pdfGenerator
     ) {}
 
     public function index(): View
@@ -102,6 +111,12 @@ class SalesOrderController extends Controller
             $html .= '<button type="button" class="btn btn-sm btn-warning btn-wave js-so-process" data-confirm="Move to pick &amp; pack?" data-url="'
                 .e(route('admin.sales.orders.process', $order)).'">Pick &amp; pack</button>';
         }
+        if ($actor->can('dispatch', $order) && in_array($order->status, ['processing'], true)) {
+            $html .= '<button type="button" class="btn btn-sm btn-info btn-wave js-so-pick-list" data-url="'
+                .e(route('admin.sales.orders.pick-list', $order)).'" data-confirm-url="'
+                .e(route('admin.sales.orders.pick-list.confirm', $order)).'" data-pdf-url="'
+                .e(route('admin.sales.orders.pick-list.pdf', $order)).'">Pick list</button>';
+        }
         if ($actor->can('dispatch', $order)) {
             $html .= '<button type="button" class="btn btn-sm btn-success btn-wave js-so-dispatch" data-url="'
                 .e(route('admin.sales.orders.dispatch', $order)).'" data-dispatch-data-url="'
@@ -111,7 +126,7 @@ class SalesOrderController extends Controller
             $html .= '<button type="button" class="btn btn-sm btn-outline-info btn-wave js-so-suggest-wo" data-confirm="Create work orders for low FG stock?" data-url="'
                 .e(route('admin.sales.orders.suggest-production', $order)).'">Suggest WO</button>';
         }
-        if ($actor->can('create', \App\Models\Invoice::class) && in_array($order->status, ['confirmed', 'dispatched', 'processing'], true)) {
+        if ($actor->can('create', Invoice::class) && in_array($order->status, ['confirmed', 'dispatched', 'processing'], true)) {
             $html .= '<button type="button" class="btn btn-sm btn-outline-primary btn-wave js-so-invoice" data-confirm="Post invoice from this order?" data-url="'
                 .e(route('admin.sales.orders.invoice', $order)).'">Invoice</button>';
         }
@@ -133,7 +148,7 @@ class SalesOrderController extends Controller
         return view('admin.sales.orders-create', [
             'customers' => Customer::query()->orderBy('name')->get(['id', 'name']),
             'items' => Item::query()->where('is_active', true)->orderBy('sku')->get(['id', 'sku', 'name']),
-            'warehouses' => \App\Models\Warehouse::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
+            'warehouses' => Warehouse::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
 
@@ -375,14 +390,14 @@ class SalesOrderController extends Controller
 
     public function invoice(Request $request, SalesOrder $salesOrder): JsonResponse
     {
-        $this->authorize('create', \App\Models\Invoice::class);
+        $this->authorize('create', Invoice::class);
         $user = $request->user();
         if ($user === null) {
             abort(403);
         }
 
         try {
-            $invoice = app(\App\Services\SalesInvoiceService::class)->createPostedFromSalesOrder(
+            $invoice = app(SalesInvoiceService::class)->createPostedFromSalesOrder(
                 $salesOrder,
                 $user,
                 $this->nextDocumentCode('invoices', 'INV-')
@@ -400,5 +415,63 @@ class SalesOrderController extends Controller
                 'message' => $e->getMessage() ?: 'Could not post invoice.',
             ], 422);
         }
+    }
+
+    public function pickListData(SalesOrder $salesOrder): JsonResponse
+    {
+        $this->authorize('dispatch', $salesOrder);
+
+        try {
+            $data = $this->pickList->buildPickList($salesOrder);
+
+            return response()->json([
+                'status' => true,
+                'data' => $data,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['status' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function confirmPick(Request $request, SalesOrder $salesOrder): JsonResponse
+    {
+        $this->authorize('dispatch', $salesOrder);
+
+        $scans = $request->input('scanned_codes', []);
+        if (! is_array($scans)) {
+            $scans = [];
+        }
+
+        try {
+            $validation = $this->pickList->validateScans($salesOrder, $scans);
+            if ($validation['matched'] < $validation['total']) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Barcode scan incomplete. Matched '.$validation['matched'].' of '.$validation['total'].'.',
+                    'data' => $validation,
+                ], 422);
+            }
+
+            $this->pickList->confirmPick($salesOrder, $request->input('packaging_notes'));
+            $this->pdfGenerator->queue(PdfDocumentType::PickList, $salesOrder, $request->user()?->id);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Pick confirmed. Pick list PDF queued.',
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['status' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function downloadPickListPdf(Request $request, SalesOrder $salesOrder): Response
+    {
+        $this->authorize('dispatch', $salesOrder);
+
+        return $this->pdfGenerator->downloadOrGenerate(
+            PdfDocumentType::PickList,
+            $salesOrder,
+            $request->user()?->id
+        );
     }
 }

@@ -41,6 +41,8 @@ class StoreEmployeeRequest extends FormRequest
             'allowances' => ['nullable', 'array'],
             'allowances.*.allowance_type_id' => ['required_with:allowances', 'integer', 'exists:allowance_types,id'],
             'allowances.*.monthly_amount' => ['required_with:allowances', 'numeric', 'min:0'],
+            'monthly_tds' => ['nullable', 'numeric', 'min:0'],
+            'create_login' => ['sometimes', 'boolean'],
         ];
     }
 }

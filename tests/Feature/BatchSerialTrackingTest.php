@@ -12,10 +12,12 @@ use App\Models\Vendor;
 use App\Models\Warehouse;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\PostsGoodsReceipts;
 use Tests\TestCase;
 
 class BatchSerialTrackingTest extends TestCase
 {
+    use PostsGoodsReceipts;
     use RefreshDatabase;
 
     public function test_batch_tracked_grn_requires_batch_and_dispatch_allocates_batch(): void
@@ -62,6 +64,8 @@ class BatchSerialTrackingTest extends TestCase
                 ],
             ],
         ])->assertCreated();
+
+        $this->postLatestGrn($user);
 
         $this->assertDatabaseHas('stock_ledger', [
             'item_id' => $batchItem->id,

@@ -14,7 +14,7 @@
 
     <div class="card custom-card">
         <div class="card-body">
-            <form id="lineDocumentForm" novalidate>
+            <form id="lineDocumentForm" novalidate enctype="multipart/form-data">
                 @csrf
                 <div class="row mb-3">
                     <div class="col-md-4">
@@ -54,12 +54,24 @@
                     <label class="form-label">Notes</label>
                     <input type="text" name="notes" class="form-control" maxlength="5000">
                 </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">QC officer</label>
+                        <input type="text" name="qc_officer_name" class="form-control" maxlength="120">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">QC photo</label>
+                        <input type="file" name="qc_photo" class="form-control" accept="image/*">
+                    </div>
+                </div>
                 <div class="table-responsive mb-3">
                     <table class="table table-bordered">
                         <thead>
                             <tr>
                                 <th>Item</th>
                                 <th>Qty</th>
+                                <th>QC status</th>
+                                <th>QC remarks</th>
                                 <th>Batch no</th>
                                 <th>Serial no</th>
                                 <th>Expiry</th>
@@ -78,6 +90,15 @@
                                     </td>
                                     <td><input type="number" step="0.0001" name="lines[{{ $i }}][quantity]"
                                             class="form-control" min="0"></td>
+                                    <td>
+                                        <select name="lines[{{ $i }}][qc_status]" class="form-select">
+                                            <option value="">—</option>
+                                            <option value="pass">Pass</option>
+                                            <option value="fail">Fail</option>
+                                            <option value="hold">Hold</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="text" name="lines[{{ $i }}][qc_remarks]" class="form-control" maxlength="500"></td>
                                     <td class="js-batch-cell">
                                         <input type="text" name="lines[{{ $i }}][batch_no]" class="form-control"
                                             maxlength="50" placeholder="If batch tracked">
@@ -110,6 +131,6 @@
         </script>
         <script src="{{ asset('js/modules/erp/batch-serial.js') }}"></script>
         <script src="{{ asset('js/modules/erp/grn-create-batch-serial.js') }}"></script>
-        <script src="{{ asset('js/modules/erp/line-document-form.js') }}"></script>
+        <script src="{{ asset('js/modules/erp/grn-form.js') }}"></script>
     @endpush
 </x-layouts.app>

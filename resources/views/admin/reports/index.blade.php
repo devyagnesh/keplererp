@@ -108,8 +108,20 @@
                                 <a href="#" class="btn btn-outline-primary btn-wave" id="gstr3bExportBtn">GSTR-3B CSV</a>
                                 <a href="#" class="btn btn-outline-secondary btn-wave" id="gstr3bPdfBtn">GSTR-3B PDF</a>
                                 <button type="button" class="btn btn-warning btn-wave" id="gstLockBtn">Lock period</button>
+                                <button type="button" class="btn btn-outline-success btn-wave" id="gstFilingBtn">Record ARN</button>
                             </div>
                         </form>
+                        <div class="row g-2 mt-2 d-none" id="gstArnForm">
+                            <div class="col-md-3">
+                                <input type="text" class="form-control form-control-sm" id="gstr1Arn" placeholder="GSTR-1 ARN">
+                            </div>
+                            <div class="col-md-3">
+                                <input type="text" class="form-control form-control-sm" id="gstr3bArn" placeholder="GSTR-3B ARN">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="number" step="0.01" class="form-control form-control-sm" id="gstr3bTaxPaid" placeholder="Tax paid">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,6 +159,7 @@
                     var plBase = @json(route('admin.reports.profit-loss'));
                     var bsBase = @json(route('admin.reports.balance-sheet'));
                     var lockUrl = @json(route('admin.reports.gst-period.lock'));
+                    var filingUrl = @json(route('admin.reports.gst-period.filing'));
 
                     function gstrParams() {
                         var $form = $('#gstrExportForm');
@@ -164,6 +177,22 @@
                             year: $f.find('[name="year"]').val(),
                             month: $f.find('[name="month"]').val(),
                         }).done(function (r) { notifySuccess(r.message); }).fail(function (x) { notifyError(x.responseJSON?.message || 'Failed'); });
+                    });
+                    $('#gstFilingBtn').on('click', function () {
+                        $('#gstArnForm').toggleClass('d-none');
+                        if ($('#gstArnForm').hasClass('d-none')) { return; }
+                        var $f = $('#gstrExportForm');
+                        $.post(filingUrl, {
+                            _token: $('meta[name="csrf-token"]').attr('content'),
+                            year: $f.find('[name="year"]').val(),
+                            month: $f.find('[name="month"]').val(),
+                            gstr1_arn: $('#gstr1Arn').val(),
+                            gstr3b_arn: $('#gstr3bArn').val(),
+                            gstr3b_tax_paid: $('#gstr3bTaxPaid').val(),
+                        }).done(function (r) {
+                            notifySuccess(r.message);
+                            $('#gstArnForm').addClass('d-none');
+                        }).fail(function (x) { notifyError(x.responseJSON?.message || 'Failed'); });
                     });
                     $('#plExportBtn').on('click', function (e) {
                         e.preventDefault();
@@ -262,6 +291,17 @@
                 </div>
             </div>
         @endif
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card custom-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card-title mb-0">PDF activity log</div>
+                        <a href="{{ route('admin.reports.pdf-log.index') }}" class="btn btn-sm btn-outline-primary btn-wave">View log</a>
+                    </div>
+                    <div class="card-body text-muted fs-13">All generated PDFs with signed download links (SRS §21.13).</div>
+                </div>
+            </div>
+        </div>
     @endcan
 
     @push('scripts')

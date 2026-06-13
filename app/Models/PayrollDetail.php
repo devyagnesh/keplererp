@@ -44,6 +44,8 @@ class PayrollDetail extends Model
         'net_salary',
         'payment_status',
         'earnings_breakdown',
+        'arrear_amount',
+        'arrear_note',
     ];
 
     /**

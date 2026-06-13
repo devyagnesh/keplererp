@@ -5,20 +5,26 @@ namespace App\Services\Pdf;
 use App\Enums\PdfDocumentType;
 use App\Jobs\GenerateDocumentPdfJob;
 use App\Models\Company;
+use App\Models\Employee;
 use App\Models\GeneratedDocument;
 use App\Models\GoodsReceipt;
 use App\Models\Invoice;
+use App\Models\Item;
+use App\Models\Payment;
 use App\Models\PayrollDetail;
 use App\Models\PayrollRun;
+use App\Models\PayrollSetting;
 use App\Models\ProductionOrder;
 use App\Models\PurchaseOrder;
 use App\Models\SalesDispatchChallan;
+use App\Models\SalesOrder;
 use App\Models\SalesQuotation;
 use App\Models\StockLedger;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorPayable;
-use App\Models\Payment;
+use App\Models\Warehouse;
+use App\Models\WarehouseTransfer;
 use App\Services\AuditLogService;
 use App\Services\GstrExportService;
 use App\Support\BarcodeSvg;
@@ -215,6 +221,9 @@ class PdfGeneratorService
             PdfDocumentType::Gstr3b => $this->gstr3bData($meta, $base),
             PdfDocumentType::VendorStatement => $this->vendorStatementData($model, $meta, $base),
             PdfDocumentType::ProductionOrder => $this->productionOrderData($model, $base),
+            PdfDocumentType::TransferChallan => $this->transferChallanData($model, $base),
+            PdfDocumentType::VendorPaymentAdvice => $this->vendorPaymentAdviceData($model, $base),
+            PdfDocumentType::PickList => $this->pickListData($model, $base),
         };
     }
 
@@ -346,7 +355,7 @@ class PdfGeneratorService
             ? Carbon::create((int) $run->period_year, (int) $run->period_month, 1)->format('F Y')
             : '';
 
-        $settings = \App\Models\PayrollSetting::current();
+        $settings = PayrollSetting::current();
         $employerPf = (string) ($detail->pf_employer ?? '0.00');
         $employerEsi = (string) ($detail->esi_employer ?? '0.00');
 
@@ -365,6 +374,12 @@ class PdfGeneratorService
         }
         if (count($earningLines) === 1 && bccomp((string) $detail->hra, '0', 2) > 0) {
             $earningLines[] = ['label' => 'HRA', 'amount' => (string) $detail->hra];
+        }
+        if (bccomp((string) ($detail->arrear_amount ?? '0'), '0', 2) > 0) {
+            $earningLines[] = [
+                'label' => (string) ($detail->arrear_note ?? 'Arrear'),
+                'amount' => (string) $detail->arrear_amount,
+            ];
         }
 
         return array_merge($base, [
@@ -449,8 +464,8 @@ class PdfGeneratorService
             'rows' => $query->get(),
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
-            'item' => \App\Models\Item::query()->find($itemId),
-            'warehouse' => $warehouseId ? \App\Models\Warehouse::query()->find($warehouseId) : null,
+            'item' => Item::query()->find($itemId),
+            'warehouse' => $warehouseId ? Warehouse::query()->find($warehouseId) : null,
         ]);
     }
 
@@ -488,6 +503,8 @@ class PdfGeneratorService
             'year' => $year,
             'month' => $month,
             'totals' => $data['totals'],
+            'itc' => $data['itc'],
+            'net_tax' => $data['net_tax'],
         ]);
     }
 
@@ -581,11 +598,24 @@ class PdfGeneratorService
     {
         /** @var ProductionOrder $order */
         $order = $model;
-        $order->loadMissing(['item', 'warehouse', 'billOfMaterial.lines.componentItem', 'creator']);
+        $order->loadMissing(['item', 'warehouse', 'billOfMaterial.lines.componentItem', 'creator', 'materials.item']);
 
         $bomLines = collect();
         if ($order->billOfMaterial !== null) {
             $bomLines = $order->billOfMaterial->lines->load('componentItem');
+        }
+
+        $materialLines = $order->materials->load('item');
+        $stockStatus = [];
+        foreach ($materialLines as $mat) {
+            $required = (float) ($mat->planned_qty ?? 0);
+            $available = (float) ($mat->actual_qty ?? 0);
+            $stockStatus[] = [
+                'item' => $mat->item?->display_label ?? '—',
+                'required' => $mat->planned_qty,
+                'available' => $mat->actual_qty,
+                'status' => $available >= $required ? 'OK' : 'SHORT',
+            ];
         }
 
         return array_merge($base, [
@@ -593,7 +623,70 @@ class PdfGeneratorService
             'item' => $order->item,
             'warehouse' => $order->warehouse,
             'bomLines' => $bomLines,
+            'materialLines' => $materialLines,
+            'stockStatus' => $stockStatus,
             'watermark' => $this->statusWatermark($order->status),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $base
+     * @return array<string, mixed>
+     */
+    protected function transferChallanData(Model $model, array $base): array
+    {
+        /** @var WarehouseTransfer $transfer */
+        $transfer = $model;
+        $transfer->loadMissing(['fromWarehouse', 'toWarehouse', 'lines.item']);
+
+        return array_merge($base, [
+            'transfer' => $transfer,
+            'fromWarehouse' => $transfer->fromWarehouse,
+            'toWarehouse' => $transfer->toWarehouse,
+            'lines' => $transfer->lines,
+            'barcodeSvg' => BarcodeSvg::code39($transfer->transfer_number),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $base
+     * @return array<string, mixed>
+     */
+    protected function vendorPaymentAdviceData(Model $model, array $base): array
+    {
+        /** @var Payment $payment */
+        $payment = $model;
+        $payment->loadMissing(['vendor']);
+
+        return array_merge($base, [
+            'payment' => $payment,
+            'vendor' => $payment->vendor,
+            'amountInWords' => NumberToWords::rupees((string) $payment->amount),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $base
+     * @return array<string, mixed>
+     */
+    protected function pickListData(Model $model, array $base): array
+    {
+        /** @var SalesOrder $order */
+        $order = $model;
+        $order->loadMissing(['lines.item', 'customer', 'warehouse']);
+        $lines = $order->lines->map(function ($line) {
+            return [
+                'item' => $line->item,
+                'quantity' => $line->quantity,
+                'barcodeSvg' => $line->item?->sku ? BarcodeSvg::code39((string) $line->item->sku) : null,
+            ];
+        });
+
+        return array_merge($base, [
+            'order' => $order,
+            'customer' => $order->customer,
+            'warehouse' => $order->warehouse,
+            'lines' => $lines,
         ]);
     }
 
@@ -632,6 +725,9 @@ class PdfGeneratorService
             PdfDocumentType::Gstr3b => sprintf('gstr3b-%04d-%02d.pdf', $meta['year'] ?? now()->year, $meta['month'] ?? now()->month),
             PdfDocumentType::VendorStatement => 'vendor-statement-'.($model->id ?? 'vendor').'.pdf',
             PdfDocumentType::ProductionOrder => 'production-'.($model->wo_number ?? $model->getKey()).'.pdf',
+            PdfDocumentType::TransferChallan => 'transfer-'.($model->transfer_number ?? $model->getKey()).'.pdf',
+            PdfDocumentType::VendorPaymentAdvice => 'payment-advice-'.($model->payment_number ?? $model->getKey()).'.pdf',
+            PdfDocumentType::PickList => 'pick-list-'.($model->order_number ?? $model->getKey()).'.pdf',
         };
     }
 
@@ -683,7 +779,7 @@ class PdfGeneratorService
     /**
      * Payslip PDF password: DDMMYYYY from date of birth, else last 4 of employee code (SRS §21.7).
      */
-    protected function payslipPassword(?\App\Models\Employee $employee): ?string
+    protected function payslipPassword(?Employee $employee): ?string
     {
         if ($employee === null) {
             return null;

@@ -21,10 +21,12 @@ use App\Models\Warehouse;
 use App\Services\InventoryStockService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\PostsGoodsReceipts;
 use Tests\TestCase;
 
 class ErpBusinessFlowTest extends TestCase
 {
+    use PostsGoodsReceipts;
     use RefreshDatabase;
 
     /**
@@ -88,6 +90,8 @@ class ErpBusinessFlowTest extends TestCase
                 ['item_id' => $ctx['item']->id, 'quantity' => 10],
             ],
         ])->assertCreated();
+
+        $this->postLatestGrn($user);
 
         $balance = InventoryBalance::query()
             ->where('warehouse_id', $ctx['warehouse']->id)

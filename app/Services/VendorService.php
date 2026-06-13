@@ -88,6 +88,8 @@ class VendorService
 
         if ($plain !== null) {
             $data['portal_password'] = $plain;
+            $data['portal_must_change_password'] = true;
+            $data['portal_password_changed_at'] = null;
         } else {
             unset($data['portal_password']);
         }

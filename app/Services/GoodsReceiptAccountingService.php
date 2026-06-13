@@ -22,6 +22,49 @@ class GoodsReceiptAccountingService
      */
     public function postPayableAndJournal(GoodsReceipt $grn, ?int $userId): void
     {
+        $totals = $this->computeTaxTotals($grn);
+        $taxable = $totals['taxable'];
+        $cgst = $totals['cgst'];
+        $sgst = $totals['sgst'];
+        $igst = $totals['igst'];
+        $total = $totals['total'];
+
+        if (bccomp($total, '0', 2) <= 0) {
+            throw new InvalidArgumentException('GRN has no billable accepted quantity.');
+        }
+
+        $sumDr = bcadd(bcadd(bcadd($taxable, $cgst, 2), $sgst, 2), $igst, 2);
+        if (bccomp($sumDr, $total, 2) !== 0) {
+            throw new InvalidArgumentException('GRN amounts do not tie to PO tax totals.');
+        }
+
+        VendorPayable::query()->create([
+            'goods_receipt_id' => $grn->id,
+            'vendor_id' => $grn->vendor_id,
+            'amount' => $total,
+            'status' => 'open',
+        ]);
+
+        $this->journal->post(
+            GoodsReceipt::class,
+            $grn->id,
+            'GRN '.$grn->grn_number,
+            $userId,
+            [
+                ['code' => 'INV-ASSET', 'debit' => $taxable, 'credit' => '0.00'],
+                ['code' => 'CGST-IN', 'debit' => $cgst, 'credit' => '0.00'],
+                ['code' => 'SGST-IN', 'debit' => $sgst, 'credit' => '0.00'],
+                ['code' => 'IGST-IN', 'debit' => $igst, 'credit' => '0.00'],
+                ['code' => 'AP-TRADE', 'debit' => '0.00', 'credit' => $total],
+            ]
+        );
+    }
+
+    /**
+     * @return array{taxable: string, cgst: string, sgst: string, igst: string, total: string}
+     */
+    public function computeTaxTotals(GoodsReceipt $grn): array
+    {
         $po = $grn->purchaseOrder;
         if ($po === null) {
             throw new InvalidArgumentException('Purchase order is required to post GRN accounting.');
@@ -59,34 +102,6 @@ class GoodsReceiptAccountingService
             $total = bcadd($total, bcmul((string) $poLine->line_total, $f, 2), 2);
         }
 
-        if (bccomp($total, '0', 2) <= 0) {
-            throw new InvalidArgumentException('GRN has no billable accepted quantity.');
-        }
-
-        $sumDr = bcadd(bcadd(bcadd($taxable, $cgst, 2), $sgst, 2), $igst, 2);
-        if (bccomp($sumDr, $total, 2) !== 0) {
-            throw new InvalidArgumentException('GRN amounts do not tie to PO tax totals.');
-        }
-
-        VendorPayable::query()->create([
-            'goods_receipt_id' => $grn->id,
-            'vendor_id' => $grn->vendor_id,
-            'amount' => $total,
-            'status' => 'open',
-        ]);
-
-        $this->journal->post(
-            GoodsReceipt::class,
-            $grn->id,
-            'GRN '.$grn->grn_number,
-            $userId,
-            [
-                ['code' => 'INV-ASSET', 'debit' => $taxable, 'credit' => '0.00'],
-                ['code' => 'CGST-IN', 'debit' => $cgst, 'credit' => '0.00'],
-                ['code' => 'SGST-IN', 'debit' => $sgst, 'credit' => '0.00'],
-                ['code' => 'IGST-IN', 'debit' => $igst, 'credit' => '0.00'],
-                ['code' => 'AP-TRADE', 'debit' => '0.00', 'credit' => $total],
-            ]
-        );
+        return compact('taxable', 'cgst', 'sgst', 'igst', 'total');
     }
 }

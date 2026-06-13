@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Admin\Concerns\IssuesDocumentNumbers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCustomerReceiptRequest;
 use App\Http\Requests\StoreVendorPaymentRequest;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\VendorInvoice;
 use App\Models\VendorPayable;
 use App\Services\PaymentService;
+use App\Services\Pdf\PdfGeneratorService;
 use App\Support\ErpDataTable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Throwable;
@@ -25,12 +29,13 @@ class FinancePaymentController extends Controller
     use IssuesDocumentNumbers;
 
     public function __construct(
-        protected PaymentService $payments
+        protected PaymentService $payments,
+        protected PdfGeneratorService $pdfGenerator
     ) {}
 
     public function index(): View
     {
-        $this->authorize('viewAny', \App\Models\Payment::class);
+        $this->authorize('viewAny', Payment::class);
 
         return view('admin.finance.payments-index', [
             'openPayables' => VendorPayable::query()
@@ -55,9 +60,9 @@ class FinancePaymentController extends Controller
 
     public function data(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', \App\Models\Payment::class);
+        $this->authorize('viewAny', Payment::class);
 
-        $query = \App\Models\Payment::query()
+        $query = Payment::query()
             ->select(['id', 'payment_number', 'payment_type', 'amount', 'payment_date', 'created_at']);
 
         $payload = ErpDataTable::run(
@@ -69,7 +74,7 @@ class FinancePaymentController extends Controller
             ['id', 'payment_number', 'payment_date', 'created_at'],
         );
 
-        $data = $payload['rows']->map(function (\App\Models\Payment $row) {
+        $data = $payload['rows']->map(function (Payment $row) {
             return [
                 'payment_number' => $row->payment_number,
                 'payment_type' => $row->payment_type,
@@ -141,5 +146,19 @@ class FinancePaymentController extends Controller
                 'message' => $e->getMessage() ?: 'Could not record receipt.',
             ], 422);
         }
+    }
+
+    public function downloadPaymentAdvice(Request $request, Payment $payment): Response
+    {
+        $this->authorize('view', $payment);
+        if ($payment->payment_type !== 'vendor') {
+            abort(404);
+        }
+
+        return $this->pdfGenerator->downloadOrGenerate(
+            PdfDocumentType::VendorPaymentAdvice,
+            $payment,
+            $request->user()?->id
+        );
     }
 }

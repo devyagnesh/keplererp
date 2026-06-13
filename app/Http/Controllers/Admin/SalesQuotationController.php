@@ -2,20 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PdfDocumentType;
 use App\Http\Controllers\Admin\Concerns\IssuesDocumentNumbers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ConvertSalesQuotationRequest;
 use App\Http\Requests\StoreSalesQuotationRequest;
 use App\Mail\SalesQuotationSentMail;
-use App\Services\PriceListService;
-use App\Services\SalesQuotationConversionService;
 use App\Models\Customer;
 use App\Models\Item;
 use App\Models\SalesQuotation;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Enums\PdfDocumentType;
 use App\Services\Pdf\PdfGeneratorService;
+use App\Services\PriceListService;
+use App\Services\SalesQuotationConversionService;
+use App\Services\WhatsApp\WhatsAppNotificationService;
 use App\Support\ErpDataTable;
 use App\Support\PdfDownloadLink;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Throwable;
 
@@ -33,7 +35,8 @@ class SalesQuotationController extends Controller
     public function __construct(
         protected SalesQuotationConversionService $conversion,
         protected PdfGeneratorService $pdfGenerator,
-        protected PriceListService $priceLists
+        protected PriceListService $priceLists,
+        protected WhatsAppNotificationService $whatsappNotifications
     ) {}
 
     public function index(): View
@@ -217,17 +220,21 @@ class SalesQuotationController extends Controller
             $salesQuotation->update(['status' => 'sent']);
             $salesQuotation->loadMissing('customer');
             $doc = $this->pdfGenerator->generate(PdfDocumentType::Quotation, $salesQuotation, $user->id);
+            $pdfUrl = $this->pdfGenerator->signedDownloadUrl($doc);
             $customer = $salesQuotation->customer;
-            if ($customer !== null && $customer->email !== null && $customer->email !== '') {
-                \Illuminate\Support\Facades\Mail::to($customer->email)->queue(
-                    new SalesQuotationSentMail($salesQuotation)
-                );
+            if ($customer !== null) {
+                $this->whatsappNotifications->notifyQuotationSent($salesQuotation, $pdfUrl);
+                if ($customer->email !== null && $customer->email !== '') {
+                    Mail::to($customer->email)->queue(
+                        new SalesQuotationSentMail($salesQuotation, $doc)
+                    );
+                }
             }
 
             return response()->json([
                 'status' => true,
                 'message' => 'Quotation sent. PDF generated.',
-                'data' => ['pdf_url' => $this->pdfGenerator->signedDownloadUrl($doc)],
+                'data' => ['pdf_url' => $pdfUrl],
             ]);
         } catch (Throwable $e) {
             Log::error('SalesQuotationController@send failed', ['message' => $e->getMessage()]);

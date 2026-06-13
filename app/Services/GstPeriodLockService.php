@@ -50,4 +50,43 @@ class GstPeriodLockService
             );
         }
     }
+
+    /**
+     * Record GSTR-1 / GSTR-3B filing ARN after return submission (SRS UC 22.5).
+     */
+    public function recordFiling(
+        int $year,
+        int $month,
+        ?string $gstr1Arn = null,
+        ?string $gstr3bArn = null,
+        ?string $gstr3bTaxPaid = null,
+        ?User $user = null
+    ): GstPeriodLock {
+        $lock = GstPeriodLock::query()->firstOrCreate(
+            ['period_year' => $year, 'period_month' => $month],
+            [
+                'locked_by' => $user?->id ?? User::query()->value('id'),
+                'locked_at' => now(),
+            ]
+        );
+
+        $updates = [];
+        if ($gstr1Arn !== null && $gstr1Arn !== '') {
+            $updates['gstr1_arn'] = $gstr1Arn;
+            $updates['gstr1_filed_at'] = now();
+        }
+        if ($gstr3bArn !== null && $gstr3bArn !== '') {
+            $updates['gstr3b_arn'] = $gstr3bArn;
+            $updates['gstr3b_filed_at'] = now();
+        }
+        if ($gstr3bTaxPaid !== null) {
+            $updates['gstr3b_tax_paid'] = $gstr3bTaxPaid;
+        }
+
+        if ($updates !== []) {
+            $lock->update($updates);
+        }
+
+        return $lock->fresh();
+    }
 }

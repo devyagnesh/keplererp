@@ -13,6 +13,56 @@
         </div>
     </div>
 
+    @if ($materials->isNotEmpty())
+        <div class="card custom-card mb-3">
+            <div class="card-header"><div class="card-title mb-0">Material consumption (SRS UC 22.3)</div></div>
+            <div class="card-body">
+                <form id="woMaterialsForm">
+                    @csrf
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Planned</th>
+                                    <th>Stock</th>
+                                    <th>Actual consumed</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($materials as $mat)
+                                    @php
+                                        $stock = $stockMap[$mat->item_id] ?? '0';
+                                        $planned = (float) $mat->planned_qty;
+                                        $ok = (float) $stock >= $planned;
+                                    @endphp
+                                    <tr data-material-id="{{ $mat->id }}">
+                                        <td>{{ $mat->item?->display_label ?? '—' }}</td>
+                                        <td>{{ $mat->planned_qty }}</td>
+                                        <td>{{ $stock }}</td>
+                                        <td>
+                                            @if ($productionOrder->status === 'in_progress')
+                                                <input type="number" step="0.0001" class="form-control form-control-sm js-actual-qty"
+                                                    value="{{ $mat->actual_qty ?? $mat->planned_qty }}" min="0">
+                                            @else
+                                                {{ $mat->actual_qty ?? '—' }}
+                                            @endif
+                                        </td>
+                                        <td><span class="badge bg-{{ $ok ? 'success' : 'danger' }}-transparent">{{ $ok ? 'OK' : 'SHORT' }}</span></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if ($productionOrder->status === 'in_progress')
+                        <button type="submit" class="btn btn-outline-primary btn-wave">Save consumption</button>
+                    @endif
+                </form>
+            </div>
+        </div>
+    @endif
+
     <div class="card custom-card">
         <div class="card-body">
             <form id="workOrderForm" novalidate>
@@ -44,7 +94,9 @@
         <script>
             window.workOrderFormSubmitUrl = @json(route('admin.production.work-orders.update', $productionOrder));
             window.workOrdersIndexUrl = @json(route('admin.production.work-orders.index'));
+            window.woMaterialsUrl = @json(route('admin.production.work-orders.materials', $productionOrder));
         </script>
         <script src="{{ asset('js/modules/erp/production-work-order-form.js') }}"></script>
+        <script src="{{ asset('js/modules/erp/production-materials.js') }}"></script>
     @endpush
 </x-layouts.app>

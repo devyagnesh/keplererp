@@ -3,16 +3,19 @@
 namespace App\Services;
 
 use App\Enums\PdfDocumentType;
+use App\Mail\PayslipProcessedMail;
 use App\Models\AttendanceEntry;
 use App\Models\Employee;
 use App\Models\PayrollDetail;
 use App\Models\PayrollRun;
 use App\Models\PayrollSetting;
 use App\Models\User;
+use App\Services\Payroll\PayrollArrearService;
 use App\Services\Pdf\PdfGeneratorService;
 use App\Services\WhatsApp\WhatsAppNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 use Throwable;
 
@@ -26,7 +29,8 @@ class PayrollRunService
         protected WhatsAppNotificationService $whatsapp,
         protected AuditLogService $auditLog,
         protected PdfGeneratorService $pdfGenerator,
-        protected PayrollCalculationService $payrollCalc
+        protected PayrollCalculationService $payrollCalc,
+        protected PayrollArrearService $arrears
     ) {}
 
     /**
@@ -36,6 +40,10 @@ class PayrollRunService
     {
         if ($run->status !== 'draft') {
             throw new InvalidArgumentException('Only draft payroll runs can be processed.');
+        }
+
+        if (! $run->attendance_locked) {
+            throw new InvalidArgumentException('Attendance must be locked before processing payroll.');
         }
 
         DB::transaction(function () use ($run, $user): void {
@@ -59,10 +67,21 @@ class PayrollRunService
             $totalPf = '0.00';
             $totalEsi = '0.00';
             $totalPt = '0.00';
+            $totalTds = '0.00';
             $totalGross = '0.00';
 
             foreach ($employees as $employee) {
                 $calc = $this->calculateForEmployee($employee, $periodStart, $periodEnd, $workingDays, $settings);
+                $arrear = $this->arrears->settlePendingForEmployee($employee, $run);
+                if (bccomp($arrear['amount'], '0', 2) > 0) {
+                    $calc['arrear_amount'] = $arrear['amount'];
+                    $calc['arrear_note'] = $arrear['note'];
+                    $calc['gross_salary'] = bcadd((string) $calc['gross_salary'], $arrear['amount'], 2);
+                    $calc['net_salary'] = bcadd((string) $calc['net_salary'], $arrear['amount'], 2);
+                    $breakdown = is_array($calc['earnings_breakdown']) ? $calc['earnings_breakdown'] : [];
+                    $breakdown['arrear'] = ['label' => $arrear['note'] ?? 'Arrear', 'amount' => $arrear['amount']];
+                    $calc['earnings_breakdown'] = $breakdown;
+                }
                 PayrollDetail::query()->create([
                     'payroll_run_id' => $run->id,
                     'employee_id' => $employee->id,
@@ -72,22 +91,27 @@ class PayrollRunService
                 $totalPf = bcadd($totalPf, $calc['pf_deduction'], 2);
                 $totalEsi = bcadd($totalEsi, $calc['esi_deduction'], 2);
                 $totalPt = bcadd($totalPt, $calc['professional_tax'], 2);
+                $totalTds = bcadd($totalTds, $calc['tds'], 2);
                 $totalGross = bcadd($totalGross, $calc['gross_salary'], 2);
             }
 
             if (bccomp($totalGross, '0', 2) > 0) {
+                $journalLines = [
+                    ['code' => 'SALARY-EXP', 'debit' => $totalGross, 'credit' => '0.00'],
+                    ['code' => 'BANK-MAIN', 'debit' => '0.00', 'credit' => $totalNet],
+                    ['code' => 'PF-PAYABLE', 'debit' => '0.00', 'credit' => $totalPf],
+                    ['code' => 'ESI-PAYABLE', 'debit' => '0.00', 'credit' => $totalEsi],
+                    ['code' => 'PT-PAYABLE', 'debit' => '0.00', 'credit' => $totalPt],
+                ];
+                if (bccomp($totalTds, '0', 2) > 0) {
+                    $journalLines[] = ['code' => 'TDS-PAYABLE', 'debit' => '0.00', 'credit' => $totalTds];
+                }
                 $this->journal->post(
                     PayrollRun::class,
                     $run->id,
                     'Payroll '.$run->period_year.'-'.$run->period_month,
                     $user->id,
-                    [
-                        ['code' => 'SALARY-EXP', 'debit' => $totalGross, 'credit' => '0.00'],
-                        ['code' => 'BANK-MAIN', 'debit' => '0.00', 'credit' => $totalNet],
-                        ['code' => 'PF-PAYABLE', 'debit' => '0.00', 'credit' => $totalPf],
-                        ['code' => 'ESI-PAYABLE', 'debit' => '0.00', 'credit' => $totalEsi],
-                        ['code' => 'PT-PAYABLE', 'debit' => '0.00', 'credit' => $totalPt],
-                    ]
+                    $journalLines
                 );
             }
 
@@ -97,6 +121,27 @@ class PayrollRunService
                 'processed_at' => now(),
             ]);
 
+            $this->auditLog->record(
+                'payroll.processed',
+                'Calculated payroll '.$run->period_year.'-'.$run->period_month,
+                $run,
+                $user
+            );
+        });
+    }
+
+    /**
+     * HR approves calculated payroll and triggers payslip delivery (SRS UC 22.4).
+     *
+     * @throws Throwable
+     */
+    public function approve(PayrollRun $run, User $user): void
+    {
+        if ($run->status !== 'processed') {
+            throw new InvalidArgumentException('Only processed payroll runs can be approved.');
+        }
+
+        DB::transaction(function () use ($run, $user): void {
             $details = PayrollDetail::query()
                 ->where('payroll_run_id', $run->id)
                 ->with('employee')
@@ -104,13 +149,21 @@ class PayrollRunService
 
             $freshRun = $run->fresh();
             foreach ($details as $detail) {
-                $this->pdfGenerator->queue(PdfDocumentType::Payslip, $detail, $user->id);
+                $document = $this->pdfGenerator->generate(PdfDocumentType::Payslip, $detail, $user->id);
+                $payslipUrl = $this->pdfGenerator->signedDownloadUrl($document);
                 if ($detail->employee !== null && $freshRun !== null) {
                     $this->whatsapp->notifySalaryCredited(
                         $detail->employee,
                         $freshRun,
-                        (string) $detail->net_salary
+                        (string) $detail->net_salary,
+                        $payslipUrl
                     );
+                    $email = $detail->employee->email;
+                    if ($email !== null && $email !== '') {
+                        Mail::to($email)->queue(
+                            new PayslipProcessedMail($detail, $document)
+                        );
+                    }
                 }
             }
 
@@ -118,9 +171,15 @@ class PayrollRunService
                 $this->pdfGenerator->queue(PdfDocumentType::PayrollSummary, $freshRun, $user->id);
             }
 
+            $run->update([
+                'status' => 'approved',
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+            ]);
+
             $this->auditLog->record(
-                'payroll.processed',
-                'Processed payroll '.$run->period_year.'-'.$run->period_month,
+                'payroll.approved',
+                'Approved payroll '.$run->period_year.'-'.$run->period_month,
                 $run,
                 $user
             );
@@ -167,7 +226,7 @@ class PayrollRunService
         $esiGross = $this->payrollCalc->grossForEsi($adjustedBasic, $employee);
         $esi = $this->payrollCalc->calculateEsi($employee, $esiGross, $settings);
         $professionalTax = $this->payrollCalc->calculateProfessionalTax($gross, $settings);
-        $tds = '0.00';
+        $tds = bcadd((string) ($employee->monthly_tds ?? '0'), '0', 2);
         $otherDeductions = '0.00';
         $deductions = bcadd(
             bcadd(bcadd(bcadd($pf['pf_employee'], $esi['esi_employee'], 2), $professionalTax, 2), $tds, 2),
@@ -197,6 +256,8 @@ class PayrollRunService
             'esi_employer' => $esi['esi_employer'],
             'net_salary' => $net,
             'payment_status' => 'PENDING',
+            'arrear_amount' => '0.00',
+            'arrear_note' => null,
         ];
     }
 }

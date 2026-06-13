@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -11,8 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $item_id
  * @property string $qty_planned
  * @property string $status
- * @property \Illuminate\Support\Carbon|null $planned_start
- * @property \Illuminate\Support\Carbon|null $planned_end
+ * @property Carbon|null $planned_start
+ * @property Carbon|null $planned_end
  * @property int|null $created_by
  * @property string|null $notes
  * @property int|null $bom_id
@@ -86,5 +88,13 @@ class ProductionOrder extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * @return HasMany<ProductionOrderMaterial, $this>
+     */
+    public function materials(): HasMany
+    {
+        return $this->hasMany(ProductionOrderMaterial::class);
     }
 }
