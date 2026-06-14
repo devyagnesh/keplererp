@@ -1,19 +1,24 @@
 <x-layouts.guest title="Sign in">
     <div class="container">
         <div class="row justify-content-center authentication authentication-basic align-items-center h-100">
-            <div class="col-md-4">
-                <div class="mb-3 d-flex justify-content-center auth-logo">
+            <div class="col-xxl-4 col-xl-5 col-lg-5 col-md-6 col-sm-8 col-12">
+                <div class="mb-4 d-flex justify-content-center auth-logo">
                     @if (! empty($companyLogoUrl))
                         <img src="{{ $companyLogoUrl }}" alt="{{ $companyDisplayName }}" class="desktop-logo img-fluid"
                             height="72">
                     @else
-                        <span class="fw-bold text-primary fs-24">{{ $companyDisplayName }}</span>
+                        <span class="auth-brand-name fs-24">{{ $companyDisplayName }}</span>
                     @endif
                 </div>
-                <div class="card custom-card my-4 border z-3 position-relative">
+                <div class="card custom-card my-4 border-0 z-3 position-relative">
                     <div class="card-body p-0">
                         <div class="p-5">
-                            <p class="h4 fw-semibold mb-2 text-center">Sign in</p>
+                            <div class="d-flex align-items-center justify-content-center mb-3">
+                                <span class="login-brand-icon" aria-hidden="true">
+                                    <i class="ri-shield-keyhole-line"></i>
+                                </span>
+                            </div>
+                            <p class="h4 fw-semibold mb-1 text-center">Sign in</p>
                             <p class="mb-4 text-muted fw-normal text-center fs-13">On-premise manufacturing ERP</p>
 
                             @if ($errors->any())
@@ -35,8 +40,8 @@
                                     <div class="col-xl-12 mb-2">
                                         <label for="password" class="form-label text-default">Password</label>
                                         <input type="password" class="form-control form-control-lg" id="password"
-                                            name="password" placeholder="Password" autocomplete="current-password"
-                                            required>
+                                            name="password" placeholder="Enter your password"
+                                            autocomplete="current-password" required>
                                         <span class="invalid-feedback d-block" id="password-error"></span>
                                     </div>
                                     <div class="col-xl-12">
@@ -50,7 +55,9 @@
                                     </div>
                                 </div>
                                 <div class="d-grid mt-4">
-                                    <button type="submit" class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2 w-100" id="loginSubmit">
+                                    <button type="submit"
+                                        class="btn btn-primary btn-lg d-flex align-items-center justify-content-center gap-2 w-100"
+                                        id="loginSubmit">
                                         <i class="ri-login-circle-line fs-18"></i> Sign in
                                     </button>
                                 </div>

@@ -75,7 +75,7 @@
                                 <span class="fw-semibold d-block">{{ $authUser->name }}</span>
                                 <span class="d-block fs-12 text-muted text-truncate">{{ $authUser->email }}</span>
                             </li>
-                            @can('company.view')
+                            @can('company.edit')
                                 <li>
                                     <a href="{{ route('admin.company.edit') }}"
                                         class="dropdown-item d-flex align-items-center py-2 {{ request()->routeIs('admin.company.*') ? 'active' : '' }}">
@@ -191,6 +191,13 @@
                                     <span class="side-menu__label">GRN returns</span>
                                 </a>
                             </li>
+                            <li class="slide">
+                                <a href="{{ route('admin.purchase.debit-notes.index') }}"
+                                    class="side-menu__item {{ request()->routeIs('admin.purchase.debit-notes.*') ? 'active' : '' }}">
+                                    <i class="ri-file-reduce-line side-menu__icon"></i>
+                                    <span class="side-menu__label">Debit notes</span>
+                                </a>
+                            </li>
                         @endif
                         @can('sales.quotation.create')
                             <li class="slide">
@@ -227,6 +234,13 @@
                             </li>
                         @endif
                         @can('sales.invoice.create')
+                            <li class="slide">
+                                <a href="{{ route('admin.sales.invoices.index') }}"
+                                    class="side-menu__item {{ request()->routeIs('admin.sales.invoices.*') ? 'active' : '' }}">
+                                    <i class="ri-file-list-3-line side-menu__icon"></i>
+                                    <span class="side-menu__label">Invoices</span>
+                                </a>
+                            </li>
                             <li class="slide">
                                 <a href="{{ route('admin.sales.credit-notes.index') }}"
                                     class="side-menu__item {{ request()->routeIs('admin.sales.credit-notes.*') ? 'active' : '' }}">
@@ -363,6 +377,15 @@
                                     class="side-menu__item {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                                     <i class="ri-group-line side-menu__icon"></i>
                                     <span class="side-menu__label">Users</span>
+                                </a>
+                            </li>
+                        @endcan
+                        @can('audit.view')
+                            <li class="slide">
+                                <a href="{{ route('admin.audit-logs.index') }}"
+                                    class="side-menu__item {{ request()->routeIs('admin.audit-logs.*') ? 'active' : '' }}">
+                                    <i class="ri-history-line side-menu__icon"></i>
+                                    <span class="side-menu__label">Audit log</span>
                                 </a>
                             </li>
                         @endcan

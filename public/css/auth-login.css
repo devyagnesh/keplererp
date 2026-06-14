@@ -1,0 +1,97 @@
+/**
+ * Login page — light neutral backdrop, white form card, primary accents only.
+ * Overrides theme authentication-background solid primary for better contrast.
+ */
+body.authentication-background {
+  background: linear-gradient(165deg, #f0f2f8 0%, #e4e8f2 50%, #dce2ef 100%);
+  min-height: 100vh;
+}
+
+body.authentication-background::before {
+  display: none;
+}
+
+.authentication.authentication-basic .auth-logo .auth-brand-name {
+  color: #1a2332;
+  font-weight: 700;
+}
+
+.authentication.authentication-basic .auth-logo img {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08));
+  max-height: 72px;
+}
+
+.authentication.authentication-basic .card.custom-card {
+  border: 1px solid rgba(115, 93, 255, 0.12);
+  box-shadow: 0 1rem 2.5rem rgba(26, 35, 50, 0.08);
+  border-radius: 0.75rem;
+  background-color: #fff;
+}
+
+.authentication.authentication-basic .login-brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  background-color: var(--primary01);
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.authentication.authentication-basic .form-label.text-default {
+  color: #374151;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.authentication.authentication-basic .form-control-lg {
+  background-color: #f9fafb;
+  border-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.authentication.authentication-basic .form-control-lg::placeholder {
+  color: #9ca3af;
+}
+
+.authentication.authentication-basic .form-control-lg:focus {
+  background-color: #fff;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem var(--primary01);
+}
+
+.authentication.authentication-basic .form-check-input:checked {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.authentication.authentication-basic .form-check-label {
+  color: #6b7280 !important;
+}
+
+.authentication.authentication-basic .h4 {
+  color: #111827;
+}
+
+.authentication.authentication-basic .text-muted {
+  color: #6b7280 !important;
+}
+
+.authentication.authentication-basic .btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.authentication.authentication-basic .btn-primary:hover,
+.authentication.authentication-basic .btn-primary:focus {
+  background-color: var(--primary08);
+  border-color: var(--primary08);
+}
+
+.authentication.authentication-basic .alert-danger {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}

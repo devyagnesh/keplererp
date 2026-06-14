@@ -76,6 +76,7 @@ class RoleAccessTest extends TestCase
             'Warehouse Manager purchase PO create' => ['Warehouse Manager', 'admin.purchase.orders.create'],
             'Accountant inventory master' => ['Accountant', 'admin.items.index'],
             'HR Manager purchase' => ['HR Manager', 'admin.purchase.orders.index'],
+            'HR Manager company setup' => ['HR Manager', 'admin.company.edit'],
             'HR Manager dashboard' => ['HR Manager', 'admin.dashboard'],
             'Production Supervisor sales' => ['Production Supervisor', 'admin.sales.quotations.index'],
             'Staff vendors' => ['Staff', 'admin.vendors.index'],
@@ -122,6 +123,13 @@ class RoleAccessTest extends TestCase
         $this->actingAs($this->actingAsRole('Staff'))
             ->get(route('admin.users.index'))
             ->assertForbidden();
+    }
+
+    public function test_hr_manager_home_redirects_to_employees_not_company_setup(): void
+    {
+        $this->actingAs($this->actingAsRole('HR Manager'))
+            ->get(route('admin.home'))
+            ->assertRedirect(route('admin.hr.employees.index'));
     }
 
     public function test_warehouse_manager_cannot_create_purchase_order(): void

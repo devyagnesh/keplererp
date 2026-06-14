@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AllowanceTypeController;
 use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\BatchSerialTraceabilityController;
 use App\Http\Controllers\Admin\BillOfMaterialController;
 use App\Http\Controllers\Admin\ChartOfAccountsController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Admin\CreditNoteController;
 use App\Http\Controllers\Admin\CustomerAddressController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DebitNoteController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\DesignationController;
 use App\Http\Controllers\Admin\DispatchChallanController;
@@ -82,9 +84,6 @@ Route::middleware('auth')->group(function (): void {
         if ($user->hasRole(['Super Admin', 'Admin'])) {
             return redirect()->route('admin.dashboard');
         }
-        if ($user->can('company.view')) {
-            return redirect()->route('admin.company.edit');
-        }
         if ($user->can('vendors.view')) {
             return redirect()->route('admin.vendors.index');
         }
@@ -141,10 +140,8 @@ Route::middleware('auth')->group(function (): void {
         ->name('admin.dashboard');
     Route::view('/admin/license-expired', 'admin.license.expired')->name('admin.license.expired');
 
-    Route::middleware('permission:company.view')->group(function (): void {
-        Route::get('/admin/company', [CompanyController::class, 'edit'])->name('admin.company.edit');
-    });
     Route::middleware('permission:company.edit')->group(function (): void {
+        Route::get('/admin/company', [CompanyController::class, 'edit'])->name('admin.company.edit');
         Route::put('/admin/company', [CompanyController::class, 'update'])->name('admin.company.update');
     });
 
@@ -153,6 +150,13 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/users/data', [UserController::class, 'data'])
             ->middleware('throttle:120,1')
             ->name('admin.users.data');
+    });
+
+    Route::middleware('permission:audit.view')->group(function (): void {
+        Route::get('/admin/audit-logs', [AuditLogController::class, 'index'])->name('admin.audit-logs.index');
+        Route::post('/admin/audit-logs/data', [AuditLogController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('admin.audit-logs.data');
     });
 
     Route::middleware('permission:users.create')->group(function (): void {
@@ -409,6 +413,10 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/admin/purchase/grn-returns/data', [GrnReturnController::class, 'data'])
             ->middleware('throttle:120,1')
             ->name('admin.purchase.grn-returns.data');
+        Route::get('/admin/purchase/debit-notes', [DebitNoteController::class, 'index'])->name('admin.purchase.debit-notes.index');
+        Route::post('/admin/purchase/debit-notes/data', [DebitNoteController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('admin.purchase.debit-notes.data');
     });
     Route::middleware('permission:purchase.grn.create')->group(function (): void {
         Route::get('/admin/purchase/grns/create', [GoodsReceiptController::class, 'create'])->name('admin.purchase.grns.create');
@@ -442,6 +450,10 @@ Route::middleware('auth')->group(function (): void {
     });
 
     Route::middleware('permission:sales.invoice.create')->group(function (): void {
+        Route::get('/admin/sales/invoices', [InvoiceController::class, 'index'])->name('admin.sales.invoices.index');
+        Route::post('/admin/sales/invoices/data', [InvoiceController::class, 'data'])
+            ->middleware('throttle:120,1')
+            ->name('admin.sales.invoices.data');
         Route::get('/admin/sales/credit-notes', [CreditNoteController::class, 'index'])->name('admin.sales.credit-notes.index');
         Route::post('/admin/sales/credit-notes/data', [CreditNoteController::class, 'data'])
             ->middleware('throttle:120,1')

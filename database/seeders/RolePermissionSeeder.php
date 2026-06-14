@@ -66,6 +66,7 @@ class RolePermissionSeeder extends Seeder
             'reports.purchase',
             'reports.inventory',
             'reports.finance',
+            'audit.view',
         ];
 
         foreach ($permissionNames as $name) {
@@ -80,7 +81,6 @@ class RolePermissionSeeder extends Seeder
             'Super Admin' => $all,
             'Admin' => $all,
             'Purchase Manager' => [
-                'company.view',
                 'vendors.view',
                 'vendors.create',
                 'vendors.edit',
@@ -95,7 +95,6 @@ class RolePermissionSeeder extends Seeder
                 'reports.inventory',
             ],
             'Sales Manager' => [
-                'company.view',
                 'customers.view',
                 'customers.create',
                 'customers.edit',
@@ -107,7 +106,6 @@ class RolePermissionSeeder extends Seeder
                 'reports.sales',
             ],
             'Warehouse Manager' => [
-                'company.view',
                 'inventory.view',
                 'inventory.adjust',
                 'inventory.transfer',
@@ -117,7 +115,6 @@ class RolePermissionSeeder extends Seeder
                 'reports.inventory',
             ],
             'Accountant' => [
-                'company.view',
                 'finance.voucher.create',
                 'finance.payment.approve',
                 'finance.reports.view',
@@ -126,13 +123,11 @@ class RolePermissionSeeder extends Seeder
                 'reports.sales',
             ],
             'HR Manager' => [
-                'company.view',
                 'hr.employee.manage',
                 'hr.attendance.mark',
                 'hr.payroll.run',
             ],
             'Production Supervisor' => [
-                'company.view',
                 'inventory.view',
                 'production.bom.create',
                 'production.order.create',
@@ -140,7 +135,6 @@ class RolePermissionSeeder extends Seeder
                 'reports.inventory',
             ],
             'Staff' => [
-                'company.view',
                 'reports.sales',
                 'reports.inventory',
             ],

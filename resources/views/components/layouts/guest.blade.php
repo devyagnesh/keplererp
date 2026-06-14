@@ -13,10 +13,11 @@
     <link rel="stylesheet" href="{{ asset('css/styles.css') }}">
     <link rel="stylesheet" href="{{ asset('css/icons.css') }}">
     <link rel="stylesheet" href="{{ asset('libs/toastify-js/src/toastify.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/auth-login.css') }}">
     @stack('styles')
 </head>
 
-<body class="authentication-background authenticationcover-background position-relative">
+<body class="authentication-background position-relative">
     {{ $slot }}
     <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
     <script src="{{ asset('libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>

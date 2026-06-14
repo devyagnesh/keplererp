@@ -110,6 +110,18 @@ class CompanySetupTest extends TestCase
     }
 
     /**
+     * Users without company.edit cannot open company setup.
+     */
+    public function test_hr_manager_cannot_view_company_setup(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $user = User::factory()->create();
+        $user->assignRole('HR Manager');
+
+        $this->actingAs($user)->get(route('admin.company.edit'))->assertForbidden();
+    }
+
+    /**
      * User with all permissions used for company tests.
      */
     private function makePrivilegedUser(): User

@@ -15,7 +15,7 @@ class CompanyPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('company.view');
+        return $user->can('company.edit');
     }
 
     /**
@@ -23,7 +23,7 @@ class CompanyPolicy
      */
     public function view(User $user, Company $company): bool
     {
-        return $user->can('company.view');
+        return $user->can('company.edit');
     }
 
     /**

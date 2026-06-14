@@ -31,8 +31,11 @@ $(function () {
                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
             },
             data: function (d) {
-                if (cfg.extraAjaxData) {
-                    $.extend(d, cfg.extraAjaxData);
+                var extra = typeof cfg.extraAjaxData === 'function'
+                    ? cfg.extraAjaxData()
+                    : cfg.extraAjaxData;
+                if (extra) {
+                    $.extend(d, extra);
                 }
             },
         },
