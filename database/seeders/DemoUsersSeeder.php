@@ -21,16 +21,16 @@ class DemoUsersSeeder extends Seeder
     public static function accounts(): array
     {
         return [
-            ['name' => 'Super Admin', 'email' => 'admin@gmail.com', 'role' => 'Super Admin', 'phone' => '9000000001'],
-            ['name' => 'System Admin', 'email' => 'admin@keplertools.test', 'role' => 'Admin', 'phone' => '9000000002'],
-            ['name' => 'Priya Purchase', 'email' => 'purchase@keplertools.test', 'role' => 'Purchase Manager', 'phone' => '9000000003'],
-            ['name' => 'Rahul Sales', 'email' => 'sales@keplertools.test', 'role' => 'Sales Manager', 'phone' => '9000000004'],
-            ['name' => 'Suresh Warehouse', 'email' => 'warehouse@keplertools.test', 'role' => 'Warehouse Manager', 'phone' => '9000000005'],
-            ['name' => 'Anita Accounts', 'email' => 'accountant@keplertools.test', 'role' => 'Accountant', 'phone' => '9000000006'],
-            ['name' => 'Meena HR', 'email' => 'hr@keplertools.test', 'role' => 'HR Manager', 'phone' => '9000000007'],
-            ['name' => 'Vikram Production', 'email' => 'production@keplertools.test', 'role' => 'Production Supervisor', 'phone' => '9000000008'],
-            ['name' => 'Kiran Staff', 'email' => 'staff@keplertools.test', 'role' => 'Staff', 'phone' => '9000000009'],
-            ['name' => 'Amit Employee', 'email' => 'employee@keplertools.test', 'role' => 'Employee', 'phone' => '9000000010'],
+            ['name' => 'Super Admin', 'email' => 'superadmin@gmail.com', 'role' => 'Super Admin', 'phone' => '9000000001'],
+            ['name' => 'System Admin', 'email' => 'admin@gmail.com', 'role' => 'Admin', 'phone' => '9000000002'],
+            ['name' => 'Priya Purchase', 'email' => 'purchase@gmail.com', 'role' => 'Purchase Manager', 'phone' => '9000000003'],
+            ['name' => 'Rahul Sales', 'email' => 'sales@gmail.com', 'role' => 'Sales Manager', 'phone' => '9000000004'],
+            ['name' => 'Suresh Warehouse', 'email' => 'warehouse@gmail.com', 'role' => 'Warehouse Manager', 'phone' => '9000000005'],
+            ['name' => 'Anita Accounts', 'email' => 'accountant@gmail.com', 'role' => 'Accountant', 'phone' => '9000000006'],
+            ['name' => 'Meena HR', 'email' => 'hr@gmail.com', 'role' => 'HR Manager', 'phone' => '9000000007'],
+            ['name' => 'Vikram Production', 'email' => 'production@gmail.com', 'role' => 'Production Supervisor', 'phone' => '9000000008'],
+            ['name' => 'Kiran Staff', 'email' => 'staff@gmail.com', 'role' => 'Staff', 'phone' => '9000000009'],
+            ['name' => 'Amit Employee', 'email' => 'employee@gmail.com', 'role' => 'Employee', 'phone' => '9000000010'],
         ];
     }
 
@@ -57,7 +57,7 @@ class DemoUsersSeeder extends Seeder
             }
         }
 
-        $employeeUser = User::query()->where('email', 'employee@keplertools.test')->first();
+        $employeeUser = User::query()->where('email', 'employee@gmail.com')->first();
         if ($employeeUser !== null) {
             Employee::query()->updateOrCreate(
                 ['emp_code' => 'EMP-DEMO'],
